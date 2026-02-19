@@ -99,7 +99,7 @@ const handleLogin = async () => {
   try {
     await loginFormRef.value.validate()
     loading.value = true
-    const response = await login({
+    await login({
       username : loginForm.value.email,
       password : loginForm.value.password
     })

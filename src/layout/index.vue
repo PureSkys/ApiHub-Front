@@ -181,6 +181,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Menu, ArrowDown, SwitchButton, RefreshLeft } from '@element-plus/icons-vue'
 import { getHealthCheck, type HealthCheckResponse } from '@/api/health'
+import { storage } from '@/utils/storage'
 
 const route = useRoute()
 const router = useRouter()
@@ -263,7 +264,7 @@ const handleCommand = async (command: string) => {
         cancelButtonText: '取消',
         type: 'warning'
       })
-      localStorage.removeItem('apihub_access_token')
+      storage.removeToken()
       ElMessage.success('已退出登录')
       router.push('/login')
     } catch (error) {

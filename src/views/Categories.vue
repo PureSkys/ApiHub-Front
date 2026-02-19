@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { Plus, Edit } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createCategory, deleteCategory, updateCategory, getCategories } from '@/api/sentence'
 import type { FormInstance, FormRules } from 'element-plus'

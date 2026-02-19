@@ -1,5 +1,6 @@
 import apiClient from './index'
 import qs from 'qs'
+import { storage } from '@/utils/storage'
 
 // 注册接口
 interface RegisterRequest {
@@ -39,9 +40,8 @@ export const login = async (data: LoginRequest) => {
     }
   })
   const token = response.data.access_token
-  console.log(token)
   if (token) {
-    localStorage.setItem('apihub_access_token', token)
+    storage.setToken(token)
   }
   return response
 }

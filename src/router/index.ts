@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { storage } from '@/utils/storage'
 
 const routes = [
   {
@@ -54,13 +55,13 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   // 设置页面标题
   document.title = `${to.meta.title || 'API Hub'}`
   
   // 检查是否需要登录
   const requiresAuth = to.meta.requiresAuth !== false
-  const token = localStorage.getItem('apihub_access_token')
+  const token = storage.getToken()
   
   if (requiresAuth && !token) {
     // 需要登录但没有token，重定向到登录页

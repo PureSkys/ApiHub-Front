@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { storage } from '@/utils/storage'
 
-export const API_BASE_URL = 'http://127.0.0.1:8000'
+export const API_BASE_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://127.0.0.1:8000'
 export const OPENAPI_DOCS_URL = `${API_BASE_URL}/docs`
 export const OPENAPI_JSON_URL = `${API_BASE_URL}/openapi.json`
 
@@ -31,7 +32,7 @@ export const getOpenAPIDocument = () => {
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('apihub_access_token')
+    const token = storage.getToken()
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -48,7 +49,7 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('apihub_access_token')
+      storage.removeToken()
       window.location.href = '/login'
     }
     return Promise.reject(error)
