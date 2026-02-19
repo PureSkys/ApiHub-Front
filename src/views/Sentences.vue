@@ -2,7 +2,7 @@
   <div class="space-y-5">
     <div class="flex justify-between items-center">
       <div class="flex items-center gap-3">
-        <el-select v-model="selectedCategory" placeholder="选择分类过滤" clearable style="width: 200px" @change="loadSentences">
+        <el-select v-model="selectedCategory" placeholder="选择分类过滤" style="width: 200px" @change="handleCategoryChange">
           <el-option label="全部" value="all" />
           <el-option v-for="cat in categories" :key="cat.id" :label="cat.category" :value="String(cat.id)" />
         </el-select>
@@ -73,6 +73,110 @@
         </el-table-column>
       </el-table>
       <el-empty v-if="sentences.length === 0 && !loading" description="暂无句子数据" />
+      
+      <div v-if="total > 0" class="pagination-container mt-6">
+        <div class="pagination-info flex items-center justify-between mb-4 px-2">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 text-sm">共</span>
+              <span class="text-indigo-600 font-bold text-lg">{{ total }}</span>
+              <span class="text-slate-500 text-sm">条记录</span>
+            </div>
+            <div class="h-4 w-px bg-slate-200"></div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 text-sm">第</span>
+              <span class="text-indigo-600 font-bold text-lg">{{ currentPage }}</span>
+              <span class="text-slate-500 text-sm">/</span>
+              <span class="text-slate-600 font-semibold">{{ totalPages }}</span>
+              <span class="text-slate-500 text-sm">页</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-slate-500 text-sm">每页显示</span>
+            <el-select
+              v-model="pageSize"
+              @change="handleSizeChange"
+              class="w-24"
+              size="small"
+            >
+              <el-option label="10条" :value="10" />
+              <el-option label="20条" :value="20" />
+              <el-option label="50条" :value="50" />
+              <el-option label="100条" :value="100" />
+            </el-select>
+          </div>
+        </div>
+        
+        <div class="pagination-controls flex items-center justify-center gap-2">
+          <el-button
+            :disabled="currentPage <= 1 || loading"
+            @click="goToPage(1)"
+            size="small"
+            class="pagination-btn"
+          >
+            <el-icon><DArrowLeft /></el-icon>
+          </el-button>
+          
+          <el-button
+            :disabled="currentPage <= 1 || loading"
+            @click="goToPage(currentPage - 1)"
+            size="small"
+            class="pagination-btn"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </el-button>
+          
+          <template v-for="page in visiblePages" :key="page">
+            <el-button
+              v-if="page !== '...'"
+              :type="page === currentPage ? 'primary' : ''"
+              size="small"
+              @click="goToPage(Number(page))"
+              :loading="loading && page === currentPage"
+              class="pagination-page-btn"
+              :class="{ 'is-active': page === currentPage }"
+            >
+              {{ page }}
+            </el-button>
+            <span v-else class="px-2 text-slate-400">...</span>
+          </template>
+          
+          <el-button
+            :disabled="currentPage >= totalPages || loading"
+            @click="goToPage(currentPage + 1)"
+            size="small"
+            class="pagination-btn"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+          
+          <el-button
+            :disabled="currentPage >= totalPages || loading"
+            @click="goToPage(totalPages)"
+            size="small"
+            class="pagination-btn"
+          >
+            <el-icon><DArrowRight /></el-icon>
+          </el-button>
+        </div>
+        
+        <div class="pagination-jump flex items-center justify-center gap-2 mt-4">
+          <span class="text-slate-500 text-sm">跳转到</span>
+          <el-input-number
+            v-model="jumpPage"
+            :min="1"
+            :max="totalPages"
+            size="small"
+            :controls="false"
+            class="w-20"
+            @keyup.enter="handleJump"
+          />
+          <span class="text-slate-500 text-sm">页</span>
+          <el-button type="primary" size="small" @click="handleJump" :loading="loading">
+            确定
+          </el-button>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog
@@ -226,10 +330,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { Plus, Upload } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import {
+  Plus,
+  Upload,
+  DArrowLeft,
+  DArrowRight,
+  ArrowLeft,
+  ArrowRight
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createSentence, deleteSentence, updateSentence, getSentences, getCategories } from '@/api/sentence'
+import { createSentence, deleteSentence, updateSentence, getPaginatedSentences, getCategories } from '@/api/sentence'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const isMobile = ref(false)
@@ -253,6 +364,11 @@ const batchResult = ref<any>({
   db_duplicates: []
 })
 
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const jumpPage = ref(1)
+
 const form = reactive({
   content: '',
   category_id: '',
@@ -260,6 +376,47 @@ const form = reactive({
   from_who: '',
   is_disabled: false,
   likes: 0
+})
+
+const totalPages = computed(() => {
+  if (total.value === 0) return 1
+  return Math.ceil(total.value / pageSize.value)
+})
+
+const visiblePages = computed(() => {
+  const pages: (number | string)[] = []
+  const current = currentPage.value
+  const total = totalPages.value
+  
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  
+  return pages
 })
 
 const rules: FormRules = {
@@ -288,11 +445,53 @@ const loadCategories = async () => {
   }
 }
 
+const handleCategoryChange = () => {
+  currentPage.value = 1
+  jumpPage.value = 1
+  loadSentences()
+}
+
+const goToPage = (page: number) => {
+  if (page < 1 || page > totalPages.value) {
+    return
+  }
+  currentPage.value = page
+  jumpPage.value = page
+  loadSentences()
+}
+
+const handleSizeChange = () => {
+  currentPage.value = 1
+  jumpPage.value = 1
+  loadSentences()
+}
+
+const handleJump = () => {
+  let page = jumpPage.value
+  if (page < 1) {
+    page = 1
+  } else if (page > totalPages.value) {
+    page = totalPages.value
+  }
+  goToPage(page)
+}
+
 const loadSentences = async () => {
   try {
     loading.value = true
-    const response = await getSentences(selectedCategory.value, 20)
-    sentences.value = response.data
+    const response = await getPaginatedSentences({
+      category_id: selectedCategory.value,
+      page: currentPage.value,
+      page_size: pageSize.value
+    })
+    sentences.value = response.data.items
+    total.value = response.data.total
+    
+    if (currentPage.value > totalPages.value && totalPages.value > 0) {
+      currentPage.value = totalPages.value
+      jumpPage.value = totalPages.value
+      await loadSentences()
+    }
   } catch (error) {
     console.error('加载句子失败:', error)
     ElMessage.error('加载句子失败')
@@ -509,6 +708,87 @@ onUnmounted(() => {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+.pagination-container {
+  background: linear-gradient(to bottom, transparent, rgba(248, 250, 252, 0.5));
+  padding: 1.5rem 1rem;
+  border-radius: 1rem;
+}
+
+.pagination-info {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pagination-btn {
+  transition: all 0.2s ease !important;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pagination-page-btn {
+  min-width: 2.5rem;
+  transition: all 0.2s ease !important;
+}
+
+.pagination-page-btn:hover:not(.is-active):not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.pagination-page-btn.is-active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.pagination-jump {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .pagination-container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .pagination-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .pagination-controls {
+    gap: 0.25rem;
+  }
+  
+  .pagination-page-btn {
+    min-width: 2rem;
+    font-size: 0.875rem;
+  }
+  
+  .pagination-jump {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .pagination-page-btn {
+    min-width: 1.75rem;
+    padding: 0.25rem 0.375rem;
+  }
+  
+  .pagination-btn {
+    padding: 0.25rem 0.5rem;
   }
 }
 </style>

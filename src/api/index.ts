@@ -1,12 +1,33 @@
 import axios from 'axios'
+
+export const API_BASE_URL = 'http://127.0.0.1:8000'
+export const OPENAPI_DOCS_URL = `${API_BASE_URL}/docs`
+export const OPENAPI_JSON_URL = `${API_BASE_URL}/openapi.json`
+
 const apiClient = axios.create({
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
+export interface OpenAPISchema {
+  openapi: string
+  info: {
+    title: string
+    version: string
+    description?: string
+  }
+  paths: Record<string, any>
+  components: {
+    schemas: Record<string, any>
+  }
+}
+
+export const getOpenAPIDocument = () => {
+  return apiClient.get<OpenAPISchema>('/openapi.json')
+}
 
 apiClient.interceptors.request.use(
   (config) => {

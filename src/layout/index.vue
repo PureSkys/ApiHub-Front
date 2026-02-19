@@ -117,13 +117,43 @@
           <span class="text-lg font-semibold text-slate-900">{{ currentTitle }}</span>
         </div>
         <div class="flex items-center gap-4">
-          <el-tag type="success" effect="light" class="rounded-full">
-            <span class="w-2 h-2 bg-green-500 rounded-full inline-block mr-2 animate-pulse"></span>
-            后端服务正常
-          </el-tag>
-          <el-dropdown @command="handleCommand">
-            <span class="flex items-center gap-2 cursor-pointer">
-              <el-avatar :size="32" class="bg-indigo-100 text-indigo-700 font-semibold">A</el-avatar>
+          <el-tooltip :content="healthTooltip" placement="bottom" :disabled="!healthData">
+            <div
+              class="health-status-tag flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer transition-all duration-300"
+              :class="[
+                healthStatus === 'loading' ? 'bg-yellow-50 border border-yellow-200' :
+                healthStatus === 'healthy' ? 'bg-green-50 border border-green-200' :
+                healthStatus === 'warning' ? 'bg-orange-50 border border-orange-200' :
+                'bg-red-50 border border-red-200'
+              ]"
+              @click="handleRetryHealth"
+            >
+              <span
+                class="status-indicator w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-300"
+                :class="[
+                  healthStatus === 'loading' ? 'bg-yellow-500 animate-pulse' :
+                  healthStatus === 'healthy' ? 'bg-green-500 animate-pulse' :
+                  healthStatus === 'warning' ? 'bg-orange-500' : 'bg-red-500'
+                ]"
+              ></span>
+              <span
+                class="status-text text-sm font-medium whitespace-nowrap transition-all duration-300"
+                :class="[
+                  healthStatus === 'loading' ? 'text-yellow-800' :
+                  healthStatus === 'healthy' ? 'text-green-800' :
+                  healthStatus === 'warning' ? 'text-orange-800' : 'text-red-800'
+                ]"
+              >{{ healthStatusText }}</span>
+              <el-icon
+                v-if="healthStatus === 'error'"
+                class="retry-icon text-xs shrink-0 transition-transform duration-300 hover:rotate-180"
+                :class="healthStatus === 'error' ? 'text-red-600' : ''"
+              ><RefreshLeft /></el-icon>
+            </div>
+          </el-tooltip>
+          <el-dropdown @command="handleCommand" class="user-dropdown">
+            <span class="user-dropdown-trigger flex items-center gap-2 cursor-pointer">
+              <el-avatar :size="32" class="user-avatar bg-indigo-100 text-indigo-700 font-semibold">A</el-avatar>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -149,13 +179,53 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Menu, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { Menu, ArrowDown, SwitchButton, RefreshLeft } from '@element-plus/icons-vue'
+import { getHealthCheck, type HealthCheckResponse } from '@/api/health'
 
 const route = useRoute()
 const router = useRouter()
 
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
+
+const healthStatus = ref<'loading' | 'healthy' | 'warning' | 'error'>('loading')
+const healthData = ref<HealthCheckResponse | null>(null)
+const healthPollingInterval = ref<number | null>(null)
+const POLLING_INTERVAL = 30000
+
+const healthStatusText = computed(() => {
+  if (healthStatus.value === 'healthy') return '服务正常'
+  if (healthStatus.value === 'warning') return '服务警告'
+  if (healthStatus.value === 'error') return '服务异常'
+  return '检查中...'
+})
+
+const healthTooltip = computed(() => {
+  if (!healthData.value) return ''
+  return `运行时间: ${healthData.value.uptime?.formatted || '未知'}\n检查时间: ${new Date(healthData.value.timestamp).toLocaleString()}`
+})
+
+const fetchHealthData = async () => {
+  try {
+    healthStatus.value = 'loading'
+    const response = await getHealthCheck()
+    healthData.value = response.data
+    if (response.data.status === 'healthy') {
+      healthStatus.value = 'healthy'
+    } else {
+      healthStatus.value = 'warning'
+    }
+  } catch (error) {
+    healthStatus.value = 'error'
+  }
+}
+
+const handleRetryHealth = () => {
+  fetchHealthData()
+  if (healthStatus.value === 'error') {
+    ElMessage.info('正在重新检查服务状态...')
+  }
+}
 
 const activeMenu = computed(() => route.path)
 const currentTitle = computed(() => route.meta?.title || '仪表盘')
@@ -174,10 +244,15 @@ const checkMobile = () => {
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  fetchHealthData()
+  healthPollingInterval.value = window.setInterval(fetchHealthData, POLLING_INTERVAL)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  if (healthPollingInterval.value) {
+    clearInterval(healthPollingInterval.value)
+  }
 })
 
 const handleCommand = async (command: string) => {
@@ -196,3 +271,152 @@ const handleCommand = async (command: string) => {
   }
 }
 </script>
+
+<style scoped>
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.health-status-tag {
+  min-width: fit-content;
+}
+
+.user-dropdown-trigger {
+  padding: 0.25rem;
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+
+.user-dropdown-trigger:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+:deep(.user-avatar),
+:deep(.user-avatar *),
+:deep(.el-avatar) {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+}
+
+:deep(.user-avatar:hover),
+:deep(.user-avatar:focus),
+:deep(.user-avatar:focus-visible),
+:deep(.user-avatar:focus-within),
+:deep(.user-avatar:active),
+:deep(.el-avatar:hover),
+:deep(.el-avatar:focus),
+:deep(.el-avatar:focus-visible),
+:deep(.el-avatar:focus-within),
+:deep(.el-avatar:active) {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+}
+
+:deep(.user-dropdown-trigger:focus),
+:deep(.user-dropdown-trigger:focus-visible),
+:deep(.user-dropdown-trigger:focus-within) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+:deep(.user-dropdown),
+:deep(.user-dropdown *),
+:deep(.el-dropdown) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+:deep(.user-dropdown:focus),
+:deep(.user-dropdown:focus-visible),
+:deep(.user-dropdown:focus-within),
+:deep(.user-dropdown:hover),
+:deep(.user-dropdown:active) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+  .health-status-tag {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .status-text {
+    font-size: 0.75rem;
+  }
+  
+  .status-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .health-status-tag {
+    padding: 0.5rem 1rem;
+  }
+  
+  .status-text {
+    font-size: 0.8125rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .health-status-tag {
+    padding: 0.5rem 1.25rem;
+  }
+}
+</style>
+
+<style>
+.user-avatar,
+.user-avatar *,
+.el-avatar,
+.el-avatar *,
+.user-dropdown,
+.user-dropdown *,
+.el-dropdown,
+.el-dropdown * {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+
+.user-avatar:hover,
+.user-avatar:focus,
+.user-avatar:focus-visible,
+.user-avatar:focus-within,
+.user-avatar:active,
+.el-avatar:hover,
+.el-avatar:focus,
+.el-avatar:focus-visible,
+.el-avatar:focus-within,
+.el-avatar:active,
+.user-dropdown:hover,
+.user-dropdown:focus,
+.user-dropdown:focus-visible,
+.user-dropdown:focus-within,
+.user-dropdown:active,
+.el-dropdown:hover,
+.el-dropdown:focus,
+.el-dropdown:focus-visible,
+.el-dropdown:focus-within,
+.el-dropdown:active {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+</style>

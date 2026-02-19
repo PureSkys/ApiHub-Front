@@ -24,6 +24,14 @@ interface GetSentencesResponse {
   updated_at: string
   is_disabled?: boolean
 }
+// 分页查询句子响应体
+interface PaginatedSentencesResponse {
+  items: GetSentencesResponse[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
 // 查询分类响应体
 interface GetCategoriesResponse {
   id: string
@@ -66,4 +74,24 @@ export const getSentences = (category_id: string = 'all', limit: number = 10) =>
   // 确保 limit 在 1~20 之间
   limit = Math.max(1, Math.min(20, limit))
   return apiClient.get<GetSentencesResponse[]>(`/sentence/${category_id}?limit=${limit}`)
+}
+// 分页查询句子API
+export const getPaginatedSentences = (params: {
+  category_id?: string
+  page?: number
+  page_size?: number
+}) => {
+  const queryParams = new URLSearchParams()
+  if (params.category_id && params.category_id !== 'all') {
+    queryParams.append('category_id', params.category_id)
+  }
+  if (params.page) {
+    queryParams.append('page', params.page.toString())
+  }
+  if (params.page_size) {
+    queryParams.append('page_size', params.page_size.toString())
+  }
+  const queryString = queryParams.toString()
+  const url = queryString ? `/sentence/admin/paginated?${queryString}` : '/sentence/admin/paginated'
+  return apiClient.get<PaginatedSentencesResponse>(url)
 }
