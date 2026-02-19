@@ -49,6 +49,10 @@ export const createCategory = (data: CreateAndUpdateCategoryRequest) => {
 export const deleteCategory = (_id: string) => {
   return apiClient.delete(`/sentence/category/${_id}`)
 }
+// 批量删除分类API
+export const batchDeleteCategories = (ids: string[]) => {
+  return Promise.all(ids.map(id => deleteCategory(id)))
+}
 // 更新分类API
 export const updateCategory = (_id: string, data: CreateAndUpdateCategoryRequest) => {
   return apiClient.put(`/sentence/category/${_id}`, data)
@@ -64,6 +68,24 @@ export const createSentence = (data: CreateAndUpdateSentenceRequest | CreateAndU
 // 删除句子API
 export const deleteSentence = (_id: string) => {
   return apiClient.delete(`/sentence/${_id}`)
+}
+// 批量删除句子API
+export const batchDeleteSentences = (ids: string[]) => {
+  return Promise.all(ids.map(id => deleteSentence(id)))
+}
+// 批量更新句子状态API - 与 updateSentence 保持一致的调用方式
+export const batchUpdateSentenceStatus = (sentences: any[], isDisabled: boolean) => {
+  return Promise.all(sentences.map(sentence => {
+    const data: CreateAndUpdateSentenceRequest = {
+      content: sentence.sentence || sentence.content || '',
+      category_id: sentence.category_id,
+      is_disabled: isDisabled,
+      from_source: sentence.from_source || '',
+      from_who: sentence.from_who || '',
+      likes: sentence.likes || 0
+    }
+    return apiClient.put(`/sentence/${sentence.id}`, data)
+  }))
 }
 // 更新句子API
 export const updateSentence = (_id: string, data: CreateAndUpdateSentenceRequest) => {

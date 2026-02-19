@@ -1,7 +1,41 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-3">
+    <div class="flex justify-between items-center flex-wrap gap-3">
+      <div v-if="selectedSentenceIds.length > 0" class="flex items-center gap-3 flex-wrap">
+        <span class="text-slate-600">已选择 {{ selectedSentenceIds.length }} 项</span>
+        <el-dropdown @command="handleBatchStatusChange">
+          <el-button type="primary" :loading="batchStatusLoading" class="transition-all duration-300 hover:scale-105">
+            <el-icon><Operation /></el-icon>
+            批量操作
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="enable">
+                <el-icon class="mr-2"><Check /></el-icon>
+                启用
+              </el-dropdown-item>
+              <el-dropdown-item command="disable">
+                <el-icon class="mr-2"><Close /></el-icon>
+                禁用
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button
+          type="danger"
+          @click="handleBatchDelete"
+          :loading="batchDeleteLoading"
+          class="transition-all duration-300 hover:scale-105"
+        >
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+        <el-button @click="clearSelection" class="transition-all duration-300 hover:scale-105">
+          取消选择
+        </el-button>
+      </div>
+      <div v-else class="flex items-center gap-3">
         <el-select v-model="selectedCategory" placeholder="选择分类过滤" style="width: 200px" @change="handleCategoryChange">
           <el-option label="全部" value="all" />
           <el-option v-for="cat in categories" :key="cat.id" :label="cat.category" :value="String(cat.id)" />
@@ -21,12 +55,15 @@
 
     <el-card class="shadow-sm rounded-2xl border-0 transition-all duration-300 hover:shadow-md">
       <el-table
+        ref="tableRef"
         :data="sentences"
         style="width: 100%"
         :stripe="true"
         :border="false"
         v-loading="loading"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" />
         <el-table-column label="ID" width="150">
           <template #default="{ row }">
             <el-tooltip :content="row.id" placement="top">
@@ -337,10 +374,15 @@ import {
   DArrowLeft,
   DArrowRight,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Delete,
+  Operation,
+  Check,
+  Close,
+  ArrowDown
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createSentence, deleteSentence, updateSentence, getPaginatedSentences, getCategories } from '@/api/sentence'
+import { createSentence, deleteSentence, updateSentence, getPaginatedSentences, getCategories, batchDeleteSentences, batchUpdateSentenceStatus } from '@/api/sentence'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const isMobile = ref(false)
@@ -352,9 +394,12 @@ const categories = ref<any[]>([])
 const loading = ref(false)
 const submitLoading = ref(false)
 const batchLoading = ref(false)
+const batchDeleteLoading = ref(false)
+const batchStatusLoading = ref(false)
 const isEdit = ref(false)
 const editId = ref('')
 const formRef = ref<FormInstance>()
+const tableRef = ref<any>(null)
 const selectedCategory = ref('all')
 const batchCategoryId = ref('')
 const batchDataStr = ref('')
@@ -363,6 +408,8 @@ const batchResult = ref<any>({
   internal_duplicates: [],
   db_duplicates: []
 })
+const selectedSentenceIds = ref<string[]>([])
+const selectedSentences = ref<any[]>([])
 
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -434,6 +481,17 @@ const copyToClipboard = (text: string) => {
   }).catch(() => {
     ElMessage.error('复制失败')
   })
+}
+
+const handleSelectionChange = (selection: any[]) => {
+  selectedSentenceIds.value = selection.map(item => item.id)
+  selectedSentences.value = [...selection]
+}
+
+const clearSelection = () => {
+  selectedSentenceIds.value = []
+  selectedSentences.value = []
+  tableRef.value?.clearSelection()
 }
 
 const loadCategories = async () => {
@@ -636,6 +694,73 @@ const handleDelete = async (id: string) => {
       console.error('删除失败:', error)
       ElMessage.error('删除失败')
     }
+  }
+}
+
+const handleBatchStatusChange = async (command: string) => {
+  if (selectedSentences.value.length === 0) {
+    ElMessage.warning('请先选择要操作的句子')
+    return
+  }
+
+  const isDisabled = command === 'disable'
+  const actionText = isDisabled ? '禁用' : '启用'
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要${actionText}选中的 ${selectedSentences.value.length} 项数据吗？`,
+      `批量${actionText}确认`,
+      {
+        confirmButtonText: `确定${actionText}`,
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    batchStatusLoading.value = true
+    await batchUpdateSentenceStatus(selectedSentences.value, isDisabled)
+    ElMessage.success(`成功${actionText} ${selectedSentences.value.length} 项数据`)
+    clearSelection()
+    await loadSentences()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error(`批量${actionText}失败:`, error)
+      ElMessage.error(error.message || `批量${actionText}失败，请重试`)
+    }
+  } finally {
+    batchStatusLoading.value = false
+  }
+}
+
+const handleBatchDelete = async () => {
+  if (selectedSentenceIds.value.length === 0) {
+    ElMessage.warning('请先选择要删除的句子')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedSentenceIds.value.length} 项数据吗？此操作不可撤销`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    batchDeleteLoading.value = true
+    await batchDeleteSentences(selectedSentenceIds.value)
+    ElMessage.success(`成功删除 ${selectedSentenceIds.value.length} 项数据`)
+    clearSelection()
+    await loadSentences()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error(error.message || '批量删除失败，请重试')
+    }
+  } finally {
+    batchDeleteLoading.value = false
   }
 }
 

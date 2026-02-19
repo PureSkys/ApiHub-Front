@@ -1,16 +1,42 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-end">
-      <el-button type="primary" @click="handleAdd" class="transition-all duration-300 hover:scale-105">
-        <el-icon>
-          <Plus />
-        </el-icon>
-        添加分类
-      </el-button>
+    <div class="flex justify-between items-center">
+      <div v-if="selectedCategoryIds.length > 0" class="flex items-center gap-3">
+        <span class="text-slate-600">已选择 {{ selectedCategoryIds.length }} 项</span>
+        <el-button
+          type="danger"
+          @click="handleBatchDelete"
+          :loading="batchDeleteLoading"
+          class="transition-all duration-300 hover:scale-105"
+        >
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+        <el-button @click="clearSelection" class="transition-all duration-300 hover:scale-105">
+          取消选择
+        </el-button>
+      </div>
+      <div v-else class="flex justify-end">
+        <el-button type="primary" @click="handleAdd" class="transition-all duration-300 hover:scale-105">
+          <el-icon>
+            <Plus />
+          </el-icon>
+          添加分类
+        </el-button>
+      </div>
     </div>
 
     <el-card class="shadow-sm rounded-2xl border-0 transition-all duration-300 hover:shadow-md">
-      <el-table :data="categories" style="width: 100%" :stripe="true" :border="false" v-loading="loading">
+      <el-table
+        ref="tableRef"
+        :data="categories"
+        style="width: 100%"
+        :stripe="true"
+        :border="false"
+        v-loading="loading"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
         <el-table-column label="ID" width="150">
           <template #default="{ row }">
             <el-tooltip :content="row.id" placement="top">
@@ -73,9 +99,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createCategory, deleteCategory, updateCategory, getCategories } from '@/api/sentence'
+import { createCategory, deleteCategory, updateCategory, getCategories, batchDeleteCategories } from '@/api/sentence'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const isMobile = ref(false)
@@ -83,9 +109,12 @@ const showAddDialog = ref(false)
 const categories = ref<any[]>([])
 const loading = ref(false)
 const submitLoading = ref(false)
+const batchDeleteLoading = ref(false)
 const isEdit = ref(false)
 const editId = ref('')
 const formRef = ref<FormInstance>()
+const selectedCategoryIds = ref<string[]>([])
+const tableRef = ref<any>(null)
 
 const form = reactive({
   name: '',
@@ -117,6 +146,15 @@ const loadCategories = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSelectionChange = (selection: any[]) => {
+  selectedCategoryIds.value = selection.map(item => item.id)
+}
+
+const clearSelection = () => {
+  selectedCategoryIds.value = []
+  tableRef.value?.clearSelection()
 }
 
 const handleAdd = () => {
@@ -178,6 +216,38 @@ const handleDelete = async (id: string) => {
       console.error('删除失败:', error)
       ElMessage.error('删除失败')
     }
+  }
+}
+
+const handleBatchDelete = async () => {
+  if (selectedCategoryIds.value.length === 0) {
+    ElMessage.warning('请先选择要删除的分类')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedCategoryIds.value.length} 项数据吗？此操作不可撤销`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    batchDeleteLoading.value = true
+    await batchDeleteCategories(selectedCategoryIds.value)
+    ElMessage.success(`成功删除 ${selectedCategoryIds.value.length} 项数据`)
+    clearSelection()
+    await loadCategories()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error(error.message || '批量删除失败，请重试')
+    }
+  } finally {
+    batchDeleteLoading.value = false
   }
 }
 
