@@ -50,7 +50,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/apihub'),
   routes
 })
 
@@ -58,11 +58,11 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   // 设置页面标题
   document.title = `${to.meta.title || 'API Hub'}`
-  
+
   // 检查是否需要登录
   const requiresAuth = to.meta.requiresAuth !== false
   const token = storage.getToken()
-  
+
   if (requiresAuth && !token) {
     // 需要登录但没有token，重定向到登录页
     next('/login')
