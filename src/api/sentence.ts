@@ -69,23 +69,64 @@ export const createSentence = (data: CreateAndUpdateSentenceRequest | CreateAndU
 export const deleteSentence = (_id: string) => {
   return apiClient.delete(`/sentence/${_id}`)
 }
-// 批量删除句子API
+// 批量删除句子API - 旧版本（逐个删除）
 export const batchDeleteSentences = (ids: string[]) => {
   return Promise.all(ids.map(id => deleteSentence(id)))
 }
-// 批量更新句子状态API - 与 updateSentence 保持一致的调用方式
-export const batchUpdateSentenceStatus = (sentences: any[], isDisabled: boolean) => {
-  return Promise.all(sentences.map(sentence => {
-    const data: CreateAndUpdateSentenceRequest = {
-      content: sentence.sentence || sentence.content || '',
-      category_id: sentence.category_id,
-      is_disabled: isDisabled,
-      from_source: sentence.from_source || '',
-      from_who: sentence.from_who || '',
-      likes: sentence.likes || 0
+
+// 批量删除句子API - 新版本（后端批量接口）
+export const batchDeleteSentencesV2 = async (ids: string[]) => {
+  const response = await apiClient.post('/sentence/admin/batch/delete', { ids })
+  return response
+}
+
+// 批量更新句子状态API - 旧版本（逐个更新）
+export const batchUpdateSentenceStatus = async (sentences: any[], isDisabled: boolean) => {
+  const results = await Promise.allSettled(
+    sentences.map(sentence => {
+      const data: CreateAndUpdateSentenceRequest = {
+        content: sentence.sentence || sentence.content || '',
+        category_id: sentence.category_id,
+        is_disabled: isDisabled,
+        from_source: sentence.from_source || '',
+        from_who: sentence.from_who || '',
+        likes: sentence.likes || 0
+      }
+      return apiClient.put(`/sentence/${sentence.id}`, data)
+    })
+  )
+  
+  const successItems: string[] = []
+  const failedItems: { id: string; reason: string }[] = []
+  
+  results.forEach((result, index) => {
+    const sentence = sentences[index]
+    if (result.status === 'fulfilled') {
+      successItems.push(sentence.id)
+    } else {
+      failedItems.push({
+        id: sentence.id,
+        reason: result.reason?.message || '未知错误'
+      })
     }
-    return apiClient.put(`/sentence/${sentence.id}`, data)
-  }))
+  })
+  
+  return {
+    total: sentences.length,
+    successCount: successItems.length,
+    failedCount: failedItems.length,
+    successIds: successItems,
+    failedItems: failedItems
+  }
+}
+
+// 批量更新句子状态API - 新版本（后端批量接口）
+export const batchUpdateSentenceStatusV2 = async (ids: string[], isDisabled: boolean) => {
+  const response = await apiClient.post('/sentence/admin/batch/status', { 
+    ids, 
+    is_disabled: isDisabled 
+  })
+  return response
 }
 // 更新句子API
 export const updateSentence = (_id: string, data: CreateAndUpdateSentenceRequest) => {
@@ -102,6 +143,8 @@ export const getPaginatedSentences = (params: {
   category_id?: string
   page?: number
   page_size?: number
+  search?: string
+  is_disabled?: boolean | string
 }) => {
   const queryParams = new URLSearchParams()
   if (params.category_id && params.category_id !== 'all') {
@@ -113,7 +156,33 @@ export const getPaginatedSentences = (params: {
   if (params.page_size) {
     queryParams.append('page_size', params.page_size.toString())
   }
+  if (params.search && params.search.trim()) {
+    queryParams.append('search', params.search.trim())
+  }
+  if (params.is_disabled !== undefined && params.is_disabled !== 'all' && params.is_disabled !== '') {
+    const disabledValue = params.is_disabled === true || params.is_disabled === 'true' || params.is_disabled === 'disabled'
+    queryParams.append('is_disabled', disabledValue.toString())
+  }
   const queryString = queryParams.toString()
   const url = queryString ? `/sentence/admin/paginated?${queryString}` : '/sentence/admin/paginated'
   return apiClient.get<PaginatedSentencesResponse>(url)
+}
+
+// 句子统计响应体
+interface SentenceStatsResponse {
+  total_sentences: number
+  enabled_sentences: number
+  disabled_sentences: number
+  categories: Array<{
+    id: string
+    name: string
+    total: number
+    enabled: number
+    disabled: number
+  }>
+}
+
+// 获取句子统计数据API
+export const getSentenceStats = () => {
+  return apiClient.get<SentenceStatsResponse>('/sentence/admin/stats')
 }

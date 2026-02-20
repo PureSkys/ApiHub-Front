@@ -1,57 +1,26 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-between items-center flex-wrap gap-3">
-      <div v-if="selectedSentenceIds.length > 0" class="flex items-center gap-3 flex-wrap">
-        <span class="text-slate-600">已选择 {{ selectedSentenceIds.length }} 项</span>
-        <el-dropdown @command="handleBatchStatusChange">
-          <el-button type="primary" :loading="batchStatusLoading" class="transition-all duration-300 hover:scale-105">
-            <el-icon><Operation /></el-icon>
-            批量操作
-            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="enable">
-                <el-icon class="mr-2"><Check /></el-icon>
-                启用
-              </el-dropdown-item>
-              <el-dropdown-item command="disable">
-                <el-icon class="mr-2"><Close /></el-icon>
-                禁用
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button
-          type="danger"
-          @click="handleBatchDelete"
-          :loading="batchDeleteLoading"
-          class="transition-all duration-300 hover:scale-105"
-        >
-          <el-icon><Delete /></el-icon>
-          批量删除
-        </el-button>
-        <el-button @click="clearSelection" class="transition-all duration-300 hover:scale-105">
-          取消选择
-        </el-button>
-      </div>
-      <div v-else class="flex items-center gap-3">
-        <el-select v-model="selectedCategory" placeholder="选择分类过滤" style="width: 200px" @change="handleCategoryChange">
-          <el-option label="全部" value="all" />
-          <el-option v-for="cat in categories" :key="cat.id" :label="cat.category" :value="String(cat.id)" />
-        </el-select>
-      </div>
-      <div class="flex items-center gap-3">
-        <el-button @click="showBatchDialog = true" class="transition-all duration-300 hover:scale-105">
-          <el-icon><Upload /></el-icon>
-          批量导入
-        </el-button>
-        <el-button type="primary" @click="handleAdd" class="transition-all duration-300 hover:scale-105">
-          <el-icon><Plus /></el-icon>
-          添加句子
-        </el-button>
-      </div>
-    </div>
+    <SentenceFilterCard
+      :categories="categories"
+      v-model:selected-category="selectedCategory"
+      v-model:selected-status="selectedStatus"
+      v-model:search-query="searchQuery"
+      :selected-sentence-ids="selectedSentenceIds"
+      :has-active-filters="hasActiveFilters"
+      :batch-status-loading="batchStatusLoading"
+      :batch-delete-loading="batchDeleteLoading"
+      @search-input="debouncedFilter"
+      @perform-search="performSearch"
+      @clear-search="clearSearch"
+      @category-change="handleCategoryChange"
+      @status-change="handleStatusChange"
+      @clear-all-filters="clearAllFilters"
+      @show-batch-import="showBatchDialog = true"
+      @show-add-dialog="handleAdd"
+      @batch-status-change="handleBatchStatusChange"
+      @batch-delete="handleBatchDelete"
+      @clear-selection="clearSelection"
+    />
 
     <el-card class="shadow-sm rounded-2xl border-0 transition-all duration-300 hover:shadow-md">
       <el-table
@@ -78,7 +47,7 @@
         </el-table-column>
         <el-table-column label="内容" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.sentence || row.content }}
+            <span v-html="highlightText(row.sentence || row.content, searchQuery)"></span>
           </template>
         </el-table-column>
         <el-table-column label="分类" width="180">
@@ -93,9 +62,14 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="180">
+        <el-table-column label="创建时间" width="180" sortable prop="created_at">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="更新时间" width="180" sortable prop="updated_at">
+          <template #default="{ row }">
+            {{ formatDate(row.updated_at) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200">
@@ -109,7 +83,8 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="sentences.length === 0 && !loading" description="暂无句子数据" />
+      <el-empty v-if="sentences.length === 0 && !loading" :description="searchQuery ? '没有找到匹配的句子，请尝试其他关键词' : '暂无句子数据'" />
+      <el-alert v-if="searchQuery && sentences.length > 0" type="success" :title="`找到 ${sentences.length} 条匹配结果`" show-icon class="mb-4" />
       
       <div v-if="total > 0" class="pagination-container mt-6">
         <div class="pagination-info flex items-center justify-between mb-4 px-2">
@@ -561,31 +536,82 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="showBatchResultDialog"
+      title="批量操作结果"
+      width="600px"
+      :fullscreen="isMobile"
+      class="custom-dialog"
+      :close-on-click-modal="false"
+    >
+      <div v-if="batchOperationResult" class="space-y-4">
+        <div class="grid grid-cols-3 gap-4">
+          <el-card shadow="never" class="text-center">
+            <div class="text-3xl font-bold text-slate-600">{{ batchOperationResult.total }}</div>
+            <div class="text-sm text-slate-500 mt-1">总计</div>
+          </el-card>
+          <el-card shadow="never" class="text-center">
+            <div class="text-3xl font-bold text-green-600">{{ batchOperationResult.successCount }}</div>
+            <div class="text-sm text-slate-500 mt-1">成功</div>
+          </el-card>
+          <el-card shadow="never" class="text-center">
+            <div class="text-3xl font-bold text-red-600">{{ batchOperationResult.failedCount }}</div>
+            <div class="text-sm text-slate-500 mt-1">失败</div>
+          </el-card>
+        </div>
+        
+        <el-alert
+          :title="`批量${batchOperationResult.actionText}操作完成`"
+          :type="batchOperationResult.failedCount === 0 ? 'success' : batchOperationResult.successCount === 0 ? 'error' : 'warning'"
+          :description="batchOperationResult.failedCount === 0 
+            ? `所有 ${batchOperationResult.successCount} 项数据已成功${batchOperationResult.actionText}` 
+            : `成功${batchOperationResult.actionText} ${batchOperationResult.successCount} 项，失败 ${batchOperationResult.failedCount} 项`"
+          show-icon
+          class="mt-4"
+        />
+        
+        <div v-if="batchOperationResult.failedItems.length > 0">
+          <div class="text-sm font-semibold text-slate-700 mb-3">失败详情</div>
+          <el-table :data="batchOperationResult.failedItems" border style="width: 100%" max-height="300">
+            <el-table-column label="句子ID" prop="id" width="280" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-tooltip :content="row.id" placement="top">
+                  <span class="truncate cursor-pointer text-blue-600 hover:text-blue-800" @click="copyToClipboard(row.id)">
+                    {{ row.id }}
+                  </span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+            <el-table-column label="失败原因" prop="reason" show-overflow-tooltip />
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button type="primary" @click="showBatchResultDialog = false">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import {
-  Plus,
-  Upload,
   DArrowLeft,
   DArrowRight,
   ArrowLeft,
-  ArrowRight,
-  Delete,
-  Operation,
-  Check,
-  Close,
-  ArrowDown
+  ArrowRight
 } from '@element-plus/icons-vue'
+import SentenceFilterCard from '@/components/SentenceFilterCard.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createSentence, deleteSentence, updateSentence, getPaginatedSentences, getCategories, batchDeleteSentences, batchUpdateSentenceStatus } from '@/api/sentence'
+import { createSentence, deleteSentence, updateSentence, getPaginatedSentences, getCategories, batchDeleteSentencesV2, batchUpdateSentenceStatusV2 } from '@/api/sentence'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const isMobile = ref(false)
 const showDialog = ref(false)
 const showBatchDialog = ref(false)
+const showBatchResultDialog = ref(false)
 const batchStep = ref(1)
 const sentences = ref<any[]>([])
 const categories = ref<any[]>([])
@@ -599,12 +625,34 @@ const editId = ref('')
 const formRef = ref<FormInstance>()
 const tableRef = ref<any>(null)
 const selectedCategory = ref('all')
+const selectedStatus = ref('all')
 const batchCategoryId = ref('')
 const batchDataStr = ref('')
 const batchParseError = ref('')
 const rawData = ref<any[]>([])
 const availableFields = ref<string[]>([])
 const importProgress = ref(0)
+const searchQuery = ref('')
+const batchOperationResult = ref<{
+  actionText: string
+  total: number
+  successCount: number
+  failedCount: number
+  failedItems: { id: string; reason: string }[]
+} | null>(null)
+let searchDebounceTimer: any = null
+let filterDebounceTimer: any = null
+
+const hasActiveFilters = computed(() => {
+  return !!(selectedCategory.value !== 'all' || 
+         selectedStatus.value !== 'all' || 
+         searchQuery.value.trim())
+})
+
+const getIsDisabledParam = () => {
+  if (selectedStatus.value === 'all') return undefined
+  return selectedStatus.value === 'disabled'
+}
 
 interface FieldMappingItem {
   targetField: string
@@ -741,6 +789,7 @@ const loadCategories = async () => {
 const handleCategoryChange = () => {
   currentPage.value = 1
   jumpPage.value = 1
+  saveFilters()
   loadSentences()
 }
 
@@ -772,10 +821,13 @@ const handleJump = () => {
 const loadSentences = async () => {
   try {
     loading.value = true
+    
     const response = await getPaginatedSentences({
       category_id: selectedCategory.value,
       page: currentPage.value,
-      page_size: pageSize.value
+      page_size: pageSize.value,
+      search: searchQuery.value.trim() || undefined,
+      is_disabled: getIsDisabledParam()
     })
     sentences.value = response.data.items
     total.value = response.data.total
@@ -791,6 +843,77 @@ const loadSentences = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const debouncedFilter = () => {
+  if (filterDebounceTimer) {
+    clearTimeout(filterDebounceTimer)
+  }
+  filterDebounceTimer = setTimeout(() => {
+    loadSentences()
+  }, 300)
+}
+
+const handleStatusChange = () => {
+  currentPage.value = 1
+  jumpPage.value = 1
+  saveFilters()
+  loadSentences()
+}
+
+const clearAllFilters = () => {
+  selectedCategory.value = 'all'
+  selectedStatus.value = 'all'
+  searchQuery.value = ''
+  currentPage.value = 1
+  jumpPage.value = 1
+  saveFilters()
+  loadSentences()
+}
+
+const saveFilters = () => {
+  try {
+    const filters = {
+      selectedCategory: selectedCategory.value,
+      selectedStatus: selectedStatus.value
+    }
+    localStorage.setItem('sentenceFilters', JSON.stringify(filters))
+  } catch (e) {
+    console.error('保存筛选条件失败:', e)
+  }
+}
+
+const loadFilters = () => {
+  try {
+    const saved = localStorage.getItem('sentenceFilters')
+    if (saved) {
+      const filters = JSON.parse(saved)
+      selectedCategory.value = filters.selectedCategory || 'all'
+      selectedStatus.value = filters.selectedStatus || 'all'
+    }
+  } catch (e) {
+    console.error('加载筛选条件失败:', e)
+  }
+}
+
+const performSearch = () => {
+  currentPage.value = 1
+  jumpPage.value = 1
+  loadSentences()
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  currentPage.value = 1
+  jumpPage.value = 1
+  loadSentences()
+}
+
+const highlightText = (text: string, query: string) => {
+  if (!query || !text) return text
+  
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+  return text.replace(regex, '<span class="bg-yellow-200 text-yellow-800 font-medium px-1 rounded">$1</span>')
 }
 
 const getCategoryName = (categoryId: any) => {
@@ -1068,7 +1191,7 @@ const handleDelete = async (id: string) => {
 }
 
 const handleBatchStatusChange = async (command: string) => {
-  if (selectedSentences.value.length === 0) {
+  if (selectedSentenceIds.value.length === 0) {
     ElMessage.warning('请先选择要操作的句子')
     return
   }
@@ -1078,7 +1201,7 @@ const handleBatchStatusChange = async (command: string) => {
 
   try {
     await ElMessageBox.confirm(
-      `确定要${actionText}选中的 ${selectedSentences.value.length} 项数据吗？`,
+      `确定要${actionText}选中的 ${selectedSentenceIds.value.length} 项数据吗？`,
       `批量${actionText}确认`,
       {
         confirmButtonText: `确定${actionText}`,
@@ -1088,14 +1211,33 @@ const handleBatchStatusChange = async (command: string) => {
     )
 
     batchStatusLoading.value = true
-    await batchUpdateSentenceStatus(selectedSentences.value, isDisabled)
-    ElMessage.success(`成功${actionText} ${selectedSentences.value.length} 项数据`)
+    const response = await batchUpdateSentenceStatusV2(selectedSentenceIds.value, isDisabled)
+    
+    const result = response.data || {}
+    const successCount = result.success_count || result.successCount || selectedSentenceIds.value.length
+    const failedCount = result.failed_count || result.failedCount || 0
+    const failedItems = result.failed_items || result.failedItems || []
+    
+    batchOperationResult.value = {
+      actionText,
+      total: selectedSentenceIds.value.length,
+      successCount,
+      failedCount,
+      failedItems
+    }
+    
+    if (failedCount > 0) {
+      showBatchResultDialog.value = true
+    } else {
+      ElMessage.success(`成功${actionText} ${successCount} 项数据`)
+    }
+    
     clearSelection()
     await loadSentences()
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error(`批量${actionText}失败:`, error)
-      ElMessage.error(error.message || `批量${actionText}失败，请重试`)
+      ElMessage.error(error.response?.data?.detail || error.message || `批量${actionText}失败，请重试`)
     }
   } finally {
     batchStatusLoading.value = false
@@ -1120,14 +1262,33 @@ const handleBatchDelete = async () => {
     )
 
     batchDeleteLoading.value = true
-    await batchDeleteSentences(selectedSentenceIds.value)
-    ElMessage.success(`成功删除 ${selectedSentenceIds.value.length} 项数据`)
+    const response = await batchDeleteSentencesV2(selectedSentenceIds.value)
+    
+    const result = response.data || {}
+    const successCount = result.success_count || result.successCount || selectedSentenceIds.value.length
+    const failedCount = result.failed_count || result.failedCount || 0
+    const failedItems = result.failed_items || result.failedItems || []
+    
+    batchOperationResult.value = {
+      actionText: '删除',
+      total: selectedSentenceIds.value.length,
+      successCount,
+      failedCount,
+      failedItems
+    }
+    
+    if (failedCount > 0) {
+      showBatchResultDialog.value = true
+    } else {
+      ElMessage.success(`成功删除 ${successCount} 项数据`)
+    }
+    
     clearSelection()
     await loadSentences()
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
-      ElMessage.error(error.message || '批量删除失败，请重试')
+      ElMessage.error(error.response?.data?.detail || error.message || '批量删除失败，请重试')
     }
   } finally {
     batchDeleteLoading.value = false
@@ -1178,19 +1339,312 @@ const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
 }
 
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.search-container')) {
+    showSearchHistory.value = false
+  }
+}
+
 onMounted(() => {
   checkMobile()
   loadCategories()
+  loadFilters()
   loadSentences()
   window.addEventListener('resize', checkMobile)
+  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  document.removeEventListener('click', handleClickOutside)
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
 })
 </script>
 
 <style>
+.filter-wrapper {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  backdrop-filter: blur(10px);
+}
+
+.filter-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.filter-btn-primary:active {
+  transform: translateY(0);
+}
+
+.filter-btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.filter-btn-default {
+  background: white;
+  border: 2px solid #e2e8f0;
+  color: #475569;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn-default:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+}
+
+.search-input {
+  border-radius: 12px;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+.search-input :deep(.el-input__wrapper:hover) {
+  border-color: #cbd5e1;
+}
+
+.search-input :deep(.el-input__wrapper.is-focus) {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.search-append-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  color: white;
+  border-radius: 0 12px 12px 0;
+  transition: all 0.3s ease;
+}
+
+.search-append-btn:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.search-history-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+  z-index: 1000;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-history-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+  padding: 0 8px;
+}
+
+.search-history-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.search-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: #334155;
+}
+
+.search-history-item:hover {
+  background: #f1f5f9;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  padding-left: 4px;
+}
+
+.status-label {
+  color: #7c3aed;
+}
+
+.filter-select {
+  min-width: 160px;
+}
+
+.filter-select :deep(.el-select__wrapper) {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+.filter-select :deep(.el-select__wrapper:hover) {
+  border-color: #cbd5e1;
+}
+
+.filter-select :deep(.el-select__wrapper.is-focused) {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.category-filter :deep(.el-select__wrapper) {
+  border-color: #dbeafe;
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.category-filter :deep(.el-select__wrapper:hover) {
+  border-color: #3b82f6;
+}
+
+.category-filter :deep(.el-select__wrapper.is-focused) {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.status-filter :deep(.el-select__wrapper) {
+  border-color: #f3e8ff;
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+}
+
+.status-filter :deep(.el-select__wrapper:hover) {
+  border-color: #a855f7;
+}
+
+.status-filter :deep(.el-select__wrapper.is-focused) {
+  border-color: #9333ea;
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+}
+
+.clear-filters-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clear-filters-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.active-filters-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.filter-tag {
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.filter-tag:hover {
+  transform: scale(1.05);
+}
+
+.filter-dropdown-menu {
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+}
+
+.filter-dropdown-item {
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 2px 0;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.filter-dropdown-item:hover {
+  background: #f1f5f9;
+}
+
 .custom-dialog .el-dialog {
   border-radius: 16px !important;
   animation: dialogSlideIn 0.3s ease-out;
