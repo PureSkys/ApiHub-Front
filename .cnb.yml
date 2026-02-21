@@ -31,7 +31,7 @@ main:
             - pnpm install
         - name: Build
           script:
-            - pnpm run generate
+            - pnpm run build
         - name: Deploy to Halo
           imports: https://cnb.cool/puresky/secret-store/-/blob/main/puresky.yml
           script:
