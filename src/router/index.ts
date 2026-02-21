@@ -64,11 +64,13 @@ router.beforeEach((to, _from, next) => {
   const token = storage.getToken()
 
   if (requiresAuth && !token) {
-    // 需要登录但没有token，重定向到登录页
-    next('/login')
+    // 关键修改：用 resolve 自动拼接二级路径
+    const loginPath = router.resolve('/login').fullPath
+    next(loginPath) // 比如二级路径是 /api-hub，这里会变成 /api-hub/login
   } else if (to.path === '/login' && token) {
-    // 已登录但访问登录页，重定向到首页
-    next('/dashboard')
+    // 关键修改：自动拼接 dashboard 的路径
+    const dashboardPath = router.resolve('/dashboard').fullPath
+    next(dashboardPath) // 比如变成 /api-hub/dashboard
   } else {
     next()
   }

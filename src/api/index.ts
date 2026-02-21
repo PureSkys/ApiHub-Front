@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { storage } from '@/utils/storage'
 import { useAuthStore } from '@/stores/auth'
-
+import router from '@/router'
 export const API_BASE_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://127.0.0.1:8000'
 export const OPENAPI_DOCS_URL = `${API_BASE_URL}/docs`
 export const OPENAPI_JSON_URL = `${API_BASE_URL}/openapi.json`
@@ -57,7 +57,8 @@ apiClient.interceptors.response.use(
       } catch (e) {
         // Store may not be initialized yet
       }
-      window.location.href = '/login'
+      const basePath = router.options.history.base
+      window.location.href = `${basePath}/login`
     }
     return Promise.reject(error)
   },
