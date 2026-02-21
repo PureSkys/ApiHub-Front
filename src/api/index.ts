@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { storage } from '@/utils/storage'
+import { useAuthStore } from '@/stores/auth'
 
 export const API_BASE_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://127.0.0.1:8000'
 export const OPENAPI_DOCS_URL = `${API_BASE_URL}/docs`
@@ -50,6 +51,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       storage.removeToken()
+      try {
+        const authStore = useAuthStore()
+        authStore.setAuthenticated(false)
+      } catch (e) {
+        // Store may not be initialized yet
+      }
       window.location.href = '/login'
     }
     return Promise.reject(error)
