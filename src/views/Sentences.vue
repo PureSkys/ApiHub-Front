@@ -1339,25 +1339,16 @@ const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
 }
 
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (!target.closest('.search-container')) {
-    showSearchHistory.value = false
-  }
-}
-
 onMounted(() => {
   checkMobile()
   loadCategories()
   loadFilters()
   loadSentences()
   window.addEventListener('resize', checkMobile)
-  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
-  document.removeEventListener('click', handleClickOutside)
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
   }

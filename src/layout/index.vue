@@ -1,11 +1,11 @@
 <template>
   <el-container class="flex h-screen bg-slate-100">
     <el-drawer
+      v-if="isMobile"
       v-model="sidebarOpen"
       direction="ltr"
       size="260px"
       :with-header="false"
-      class="lg:hidden"
     >
       <div class="flex flex-col h-full">
         <div class="p-7 border-b border-slate-100">
@@ -13,48 +13,37 @@
           <p class="text-sm text-slate-500">API 聚合中心</p>
         </div>
         <nav class="flex-1 py-3">
-          <template v-for="route in menuRoutes" :key="route.path">
-            <template v-if="!route.children">
-              <router-link
-                :to="route.path"
-                class="flex items-center gap-3 mx-4 my-1 px-4 py-3 rounded-lg transition-colors"
-                :class="
-                  activeMenu.startsWith(route.path)
-                    ? 'bg-blue-50 text-slate-900 font-semibold'
-                    : 'text-slate-500 hover:bg-slate-100'
-                "
-                @click="sidebarOpen = false"
-              >
-                <el-icon>
-                  <component :is="route.meta?.icon" />
-                </el-icon>
-                <span>{{ route.meta?.title }}</span>
-              </router-link>
-            </template>
-            <template v-else>
-              <el-sub-menu :index="route.path">
-                <template #title>
+          <el-menu
+            :default-active="activeMenu"
+            class="border-0"
+            router
+          >
+            <template v-for="route in menuRoutes" :key="route.path">
+              <template v-if="!route.children">
+                <el-menu-item :index="route.path" @click="sidebarOpen = false">
                   <el-icon><component :is="route.meta?.icon" /></el-icon>
-                  <span>{{ route.meta?.title }}</span>
-                </template>
-                <router-link
-                  v-for="child in route.children.filter(c => c.meta?.title)"
-                  :key="child.path"
-                  :to="`${route.path}/${child.path}`"
-                  class="flex items-center gap-3 mx-2 my-1 px-4 py-2 rounded-lg transition-colors"
-                  :class="
-                    activeMenu === `${route.path}/${child.path}`
-                      ? 'bg-blue-50 text-slate-900 font-semibold'
-                      : 'text-slate-500 hover:bg-slate-100'
-                  "
-                  @click="sidebarOpen = false"
-                >
-                  <el-icon><component :is="child.meta?.icon" /></el-icon>
-                  <span>{{ child.meta?.title }}</span>
-                </router-link>
-              </el-sub-menu>
+                  <template #title>{{ route.meta?.title }}</template>
+                </el-menu-item>
+              </template>
+              <template v-else>
+                <el-sub-menu :index="route.path">
+                  <template #title>
+                    <el-icon><component :is="route.meta?.icon" /></el-icon>
+                    <span>{{ route.meta?.title }}</span>
+                  </template>
+                  <el-menu-item
+                    v-for="child in route.children.filter(c => c.meta?.title)"
+                    :key="`${route.path}/${child.path}`"
+                    :index="`${route.path}/${child.path}`"
+                    @click="sidebarOpen = false"
+                  >
+                    <el-icon><component :is="child.meta?.icon" /></el-icon>
+                    <template #title>{{ child.meta?.title }}</template>
+                  </el-menu-item>
+                </el-sub-menu>
+              </template>
             </template>
-          </template>
+          </el-menu>
         </nav>
         <div class="p-4 border-t border-slate-100">
           <span class="text-sm text-slate-400">v0.1.0</span>
@@ -186,7 +175,7 @@ import { storage } from '@/utils/storage'
 const route = useRoute()
 const router = useRouter()
 
-const isMobile = ref(false)
+const isMobile = ref(true)
 const sidebarOpen = ref(false)
 
 const healthStatus = ref<'loading' | 'healthy' | 'warning' | 'error'>('loading')
