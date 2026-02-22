@@ -18,6 +18,7 @@
             v-model="loginForm.email"
             placeholder="请输入邮箱"
             class="w-full"
+            @input="clearError"
           >
             <template #prefix>
               <el-icon><Message /></el-icon>
@@ -31,12 +32,18 @@
             placeholder="请输入密码"
             show-password
             class="w-full"
+            @input="clearError"
           >
             <template #prefix>
               <el-icon><Lock /></el-icon>
             </template>
           </el-input>
         </el-form-item>
+        
+        <div v-if="errorMessage" class="text-red-600 text-sm flex items-center gap-1 bg-red-50 p-3 rounded border border-red-200">
+          <el-icon><Warning /></el-icon>
+          <span>{{ errorMessage }}</span>
+        </div>
         
         <div class="flex items-center justify-between">
           <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
@@ -68,7 +75,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElIcon } from 'element-plus'
-import { Message, Lock } from '@element-plus/icons-vue'
+import { Message, Lock, Warning } from '@element-plus/icons-vue'
 import { login } from '@/api/user'
 
 const router = useRouter()
@@ -79,6 +86,7 @@ const loginForm = ref<any>({
 })
 
 const loading = ref(false)
+const errorMessage = ref('')
 
 const loginRules = reactive({
   email: [
@@ -93,22 +101,30 @@ const loginRules = reactive({
 
 const loginFormRef = ref<any>(null)
 
+const clearError = () => {
+  errorMessage.value = ''
+}
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
   try {
+    clearError()
     await loginFormRef.value.validate()
     loading.value = true
-    await login({
+    const response = await login({
       username : loginForm.value.email,
       password : loginForm.value.password
     })
-    
-    ElMessage.success('登录成功')
-    router.push('/dashboard')
+    if (response.status === 200) {
+      ElMessage.success('登录成功')
+      router.push('/dashboard')
+    } else {
+      errorMessage.value = '账号或密码错误'
+    }
   } catch (error: any) {
     console.error('登录失败:', error)
-    ElMessage.error(error.message || '登录失败，请检查账号密码')
+    errorMessage.value = '账号或密码错误'
   } finally {
     loading.value = false
   }

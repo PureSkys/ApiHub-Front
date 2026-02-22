@@ -57,8 +57,7 @@ apiClient.interceptors.response.use(
       } catch (e) {
         // Store may not be initialized yet
       }
-      const basePath = router.options.history.base
-      window.location.href = `${basePath}/login`
+      router.push('/login')
     }
     return Promise.reject(error)
   },
