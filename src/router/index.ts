@@ -46,6 +46,65 @@ const routes = [
         meta: { title: '句子管理', icon: 'Document', requiresAuth: true }
       }
     ]
+  },
+  {
+    path: '/school-management',
+    name: 'SchoolManagement',
+    meta: { title: '学校管理', icon: 'School', requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: '/school-management/overview'
+      },
+      {
+        path: 'overview',
+        name: 'SchoolOverview',
+        component: () => import('@/views/school/SchoolOverview.vue'),
+        meta: { title: '概览', icon: 'DataAnalysis', requiresAuth: true }
+      },
+      {
+        path: 'users',
+        name: 'SchoolUsers',
+        component: () => import('@/views/school/SchoolUsers.vue'),
+        meta: { title: '用户管理', icon: 'User', requiresAuth: true }
+      },
+      {
+        path: 'schools',
+        name: 'Schools',
+        component: () => import('@/views/school/Schools.vue'),
+        meta: { title: '学校管理', icon: 'OfficeBuilding', requiresAuth: true }
+      },
+      {
+        path: 'classes',
+        name: 'SchoolClasses',
+        component: () => import('@/views/school/SchoolClasses.vue'),
+        meta: { title: '班级管理', icon: 'Grid', requiresAuth: true }
+      },
+      {
+        path: 'students',
+        name: 'SchoolStudents',
+        component: () => import('@/views/school/SchoolStudents.vue'),
+        meta: { title: '学生管理', icon: 'Avatar', requiresAuth: true }
+      },
+      {
+        path: 'exams',
+        name: 'SchoolExams',
+        component: () => import('@/views/school/SchoolExams.vue'),
+        meta: { title: '考试管理', icon: 'EditPen', requiresAuth: true }
+      },
+      {
+        path: 'scores',
+        name: 'SchoolScores',
+        component: () => import('@/views/school/SchoolScores.vue'),
+        meta: { title: '成绩管理', icon: 'TrendCharts', requiresAuth: true }
+      },
+      {
+        path: 'stats',
+        name: 'SchoolStats',
+        component: () => import('@/views/school/SchoolStats.vue'),
+        meta: { title: '统计分析', icon: 'DataLine', requiresAuth: true }
+      }
+    ]
   }
 ]
 
