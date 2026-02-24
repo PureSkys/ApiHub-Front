@@ -73,9 +73,23 @@
           </div>
         </div>
 
-        <div v-if="scoreDistribution">
-          <p class="text-sm font-semibold text-slate-700 mb-3">成绩分布</p>
-          <v-chart :option="distributionChartOption" style="height: 300px;" autoresize />
+        <div v-if="scoreDistribution && scoreDistribution.distributions.length > 0">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-slate-700">各科成绩分布</p>
+            <el-radio-group v-model="distributionViewMode" size="small">
+              <el-radio-button value="stacked">堆叠图</el-radio-button>
+              <el-radio-button value="single">单科详情</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div v-if="distributionViewMode === 'stacked'">
+            <v-chart :option="distributionStackedChartOption" style="height: 350px;" autoresize />
+          </div>
+          <div v-else class="space-y-4">
+            <el-select v-model="selectedDistributionSubject" placeholder="选择科目" class="w-40 mb-2">
+              <el-option v-for="d in scoreDistribution.distributions" :key="d.subject" :label="d.subject" :value="d.subject" />
+            </el-select>
+            <v-chart :option="distributionSingleChartOption" style="height: 280px;" autoresize />
+          </div>
         </div>
 
         <div v-if="examRanking && examRanking.rankings.length > 0">
@@ -452,6 +466,9 @@ const examRanking = ref<ExamRanking | null>(null)
 const examClassComparison = ref<ExamClassComparison | null>(null)
 const examPassRate = ref<ExamPassRateStats | null>(null)
 
+const distributionViewMode = ref<'stacked' | 'single'>('stacked')
+const selectedDistributionSubject = ref('')
+
 const classFilter = reactive({
   school_id: '',
   class_id: '',
@@ -505,10 +522,62 @@ const filteredSubjectExams = computed(() => {
   return allExams.value.filter(e => e.school_id === subjectFilter.school_id)
 })
 
-const distributionChartOption = computed(() => {
-  if (!scoreDistribution || !scoreDistribution.value?.distributions?.length) return {}
+const distributionStackedChartOption = computed(() => {
+  if (!scoreDistribution.value?.distributions?.length) return {}
 
-  const distribution = scoreDistribution.value.distributions[0]
+  const distributions = scoreDistribution.value.distributions
+  const subjects = distributions.map(d => d.subject)
+  const rangeLabels = ['0-60分', '60-70分', '70-80分', '80-90分', '90-100分', '100-150分']
+  const rangeKeys = ['range_0_60', 'range_60_70', 'range_70_80', 'range_80_90', 'range_90_100', 'range_100_150'] as const
+  const colors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
+
+  return {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any[]) => {
+        let result = `<strong>${params[0].axisValue}</strong><br/>`
+        let total = 0
+        params.forEach((p: any) => {
+          if (p.value > 0) {
+            result += `${p.marker} ${p.seriesName}: ${p.value}人<br/>`
+            total += p.value
+          }
+        })
+        result += `<strong>合计: ${total}人</strong>`
+        return result
+      }
+    },
+    legend: {
+      data: rangeLabels,
+      top: '3%',
+      itemGap: 12
+    },
+    grid: { left: '3%', right: '4%', top: '15%', bottom: '8%', containLabel: true },
+    xAxis: { type: 'category', data: subjects, axisLabel: { interval: 0 } },
+    yAxis: { type: 'value', name: '人数', nameGap: 15 },
+    series: rangeKeys.map((key, index) => ({
+      name: rangeLabels[index],
+      type: 'bar',
+      stack: 'total',
+      data: distributions.map(d => d[key]),
+      itemStyle: { color: colors[index] },
+      emphasis: { focus: 'series' },
+      label: {
+        show: true,
+        position: 'inside',
+        formatter: (params: any) => params.value > 0 ? params.value : '',
+        fontSize: 10
+      }
+    }))
+  }
+})
+
+const distributionSingleChartOption = computed(() => {
+  if (!scoreDistribution.value?.distributions?.length) return {}
+
+  const subject = selectedDistributionSubject.value || scoreDistribution.value.distributions[0]?.subject || ''
+  const distribution = scoreDistribution.value.distributions.find(d => d.subject === subject)
   if (!distribution) return {}
 
   const data = [
@@ -520,21 +589,31 @@ const distributionChartOption = computed(() => {
     { value: distribution.range_100_150, name: '100-150分' }
   ].filter(d => d.value > 0)
 
+  const total = data.reduce((sum, d) => sum + d.value, 0)
+
   return {
     tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
     legend: {
-      bottom: '8%',
+      bottom: '5%',
       left: 'center',
       itemGap: 15
+    },
+    title: {
+      text: `${subject}成绩分布`,
+      subtext: `共${total}人`,
+      left: 'center',
+      top: '3%',
+      textStyle: { fontSize: 14, fontWeight: 'bold' },
+      subtextStyle: { fontSize: 12, color: '#64748b' }
     },
     series: [{
       name: '成绩分布',
       type: 'pie',
-      radius: ['35%', '60%'],
-      center: ['50%', '45%'],
+      radius: ['35%', '55%'],
+      center: ['50%', '50%'],
       avoidLabelOverlap: false,
-      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-      label: { show: true, formatter: '{b}: {c}人', fontSize: 12 },
+      itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+      label: { show: true, formatter: '{b}: {c}人\n({d}%)', fontSize: 11 },
       labelLine: { length: 10, length2: 10 },
       data: data.map((item, index) => ({
         ...item,
@@ -548,10 +627,35 @@ const classComparisonChartOption = computed(() => {
   if (!examClassComparison.value?.classes?.length) return {}
 
   const classes = examClassComparison.value.classes
+
+  const subjectConfigs = [
+    { name: '语文', key: 'avg_chinese', color: '#10b981' },
+    { name: '数学', key: 'avg_math', color: '#f59e0b' },
+    { name: '英语', key: 'avg_english', color: '#8b5cf6' },
+    { name: '物理', key: 'avg_physics', color: '#ef4444' },
+    { name: '化学', key: 'avg_chemistry', color: '#f97316' },
+    { name: '化赋', key: 'avg_chemistry_assigned', color: '#fb923c' },
+    { name: '生物', key: 'avg_biology', color: '#22c55e' },
+    { name: '生赋', key: 'avg_biology_assigned', color: '#16a34a' },
+    { name: '历史', key: 'avg_history', color: '#a855f7' },
+    { name: '政治', key: 'avg_politics', color: '#d946ef' },
+    { name: '政赋', key: 'avg_politics_assigned', color: '#c026d3' },
+    { name: '地理', key: 'avg_geography', color: '#0ea5e9' },
+    { name: '地赋', key: 'avg_geography_assigned', color: '#0891b2' }
+  ]
+
+  const validSubjects = subjectConfigs.filter(config => {
+    const hasValidData = classes.some(c => {
+      const value = c[config.key as keyof typeof c]
+      return value !== null && value !== undefined && value !== 0
+    })
+    return hasValidData
+  })
+
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: {
-      data: ['语文', '数学', '英语', '物理', '化学', '化赋', '生物', '生赋', '历史', '政治', '政赋', '地理', '地赋'],
+      data: validSubjects.map(s => s.name),
       top: '5%',
       itemGap: 10,
       type: 'scroll'
@@ -559,21 +663,16 @@ const classComparisonChartOption = computed(() => {
     grid: { left: '3%', right: '4%', top: '18%', bottom: '12%', containLabel: true },
     xAxis: { type: 'category', data: classes.map(c => c.class_name), axisLabel: { interval: 0, rotate: 0 } },
     yAxis: { type: 'value', name: '平均分', nameGap: 15 },
-    series: [
-      { name: '语文', type: 'bar', data: classes.map(c => c.avg_chinese?.toFixed(1) || 0), itemStyle: { color: '#10b981', borderRadius: [4, 4, 0, 0] }, barGap: '5%' },
-      { name: '数学', type: 'bar', data: classes.map(c => c.avg_math?.toFixed(1) || 0), itemStyle: { color: '#f59e0b', borderRadius: [4, 4, 0, 0] } },
-      { name: '英语', type: 'bar', data: classes.map(c => c.avg_english?.toFixed(1) || 0), itemStyle: { color: '#8b5cf6', borderRadius: [4, 4, 0, 0] } },
-      { name: '物理', type: 'bar', data: classes.map(c => c.avg_physics?.toFixed(1) || 0), itemStyle: { color: '#ef4444', borderRadius: [4, 4, 0, 0] } },
-      { name: '化学', type: 'bar', data: classes.map(c => c.avg_chemistry?.toFixed(1) || 0), itemStyle: { color: '#f97316', borderRadius: [4, 4, 0, 0] } },
-      { name: '化赋', type: 'bar', data: classes.map(c => c.avg_chemistry_assigned?.toFixed(1) || 0), itemStyle: { color: '#fb923c', borderRadius: [4, 4, 0, 0] } },
-      { name: '生物', type: 'bar', data: classes.map(c => c.avg_biology?.toFixed(1) || 0), itemStyle: { color: '#22c55e', borderRadius: [4, 4, 0, 0] } },
-      { name: '生赋', type: 'bar', data: classes.map(c => c.avg_biology_assigned?.toFixed(1) || 0), itemStyle: { color: '#16a34a', borderRadius: [4, 4, 0, 0] } },
-      { name: '历史', type: 'bar', data: classes.map(c => c.avg_history?.toFixed(1) || 0), itemStyle: { color: '#a855f7', borderRadius: [4, 4, 0, 0] } },
-      { name: '政治', type: 'bar', data: classes.map(c => c.avg_politics?.toFixed(1) || 0), itemStyle: { color: '#d946ef', borderRadius: [4, 4, 0, 0] } },
-      { name: '政赋', type: 'bar', data: classes.map(c => c.avg_politics_assigned?.toFixed(1) || 0), itemStyle: { color: '#c026d3', borderRadius: [4, 4, 0, 0] } },
-      { name: '地理', type: 'bar', data: classes.map(c => c.avg_geography?.toFixed(1) || 0), itemStyle: { color: '#0ea5e9', borderRadius: [4, 4, 0, 0] } },
-      { name: '地赋', type: 'bar', data: classes.map(c => c.avg_geography_assigned?.toFixed(1) || 0), itemStyle: { color: '#0891b2', borderRadius: [4, 4, 0, 0] } }
-    ]
+    series: validSubjects.map((config, index) => ({
+      name: config.name,
+      type: 'bar',
+      data: classes.map(c => {
+        const value = c[config.key as keyof typeof c]
+        return value !== null && value !== undefined ? Number(value).toFixed(1) : 0
+      }),
+      itemStyle: { color: config.color, borderRadius: [4, 4, 0, 0] },
+      barGap: index === 0 ? '5%' : undefined
+    }))
   }
 })
 
@@ -624,35 +723,90 @@ const classSubjectChartOption = computed(() => ({
 }))
 
 const trendChartOption = computed(() => {
-  const trendSubjects = ['语文', '数学', '英语']
+  if (!studentTrend.value.length) return {}
+
+  const subjectConfigs = [
+    { name: '语文', key: 'chinese', color: '#10b981' },
+    { name: '数学', key: 'math', color: '#f59e0b' },
+    { name: '英语', key: 'english', color: '#8b5cf6' },
+    { name: '物理', key: 'physics', color: '#ef4444' },
+    { name: '历史', key: 'history', color: '#a855f7' },
+    { name: '化学', key: 'chemistry', color: '#f97316' },
+    { name: '化赋', key: 'chemistry_assigned', color: '#fb923c' },
+    { name: '生物', key: 'biology', color: '#22c55e' },
+    { name: '生赋', key: 'biology_assigned', color: '#16a34a' },
+    { name: '政治', key: 'politics', color: '#d946ef' },
+    { name: '政赋', key: 'politics_assigned', color: '#c026d3' },
+    { name: '地理', key: 'geography', color: '#0ea5e9' },
+    { name: '地赋', key: 'geography_assigned', color: '#0891b2' }
+  ]
+
+  const validSubjects = subjectConfigs.filter(config => {
+    return studentTrend.value.some(e => {
+      const value = e[config.key as keyof typeof e]
+      return value !== null && value !== undefined
+    })
+  })
+
+  const hasTotalScore = studentTrend.value.some(e => e.total_score !== null)
+  const hasTotalScoreAssigned = studentTrend.value.some(e => e.total_score_assigned !== null)
+
+  const legendData = [...validSubjects.map(s => s.name)]
+  if (hasTotalScore) legendData.push('总分')
+  if (hasTotalScoreAssigned) legendData.push('赋分总分')
+
   return {
-    tooltip: { trigger: 'axis' },
+    tooltip: { 
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        let result = `<strong>${params[0].axisValue}</strong><br/>`
+        params.forEach((p: any) => {
+          if (p.value !== null && p.value !== undefined) {
+            result += `${p.marker} ${p.seriesName}: ${p.value}<br/>`
+          }
+        })
+        return result
+      }
+    },
     legend: {
-      data: [...trendSubjects, '总分'],
-      top: '5%',
-      itemGap: 20
+      data: legendData,
+      top: '3%',
+      itemGap: 12,
+      type: 'scroll'
     },
     grid: { left: '3%', right: '4%', top: '15%', bottom: '12%', containLabel: true },
     xAxis: { type: 'category', data: studentTrend.value.map(e => e.exam_name), axisLabel: { interval: 0 } },
     yAxis: { type: 'value', name: '分数', nameGap: 15 },
     series: [
-      ...trendSubjects.map(subject => ({
-        name: subject,
+      ...validSubjects.map(config => ({
+        name: config.name,
         type: 'line' as const,
-        data: studentTrend.value.map(e => e[subject === '语文' ? 'chinese' : subject === '数学' ? 'math' : 'english'] || null),
+        data: studentTrend.value.map(e => e[config.key as keyof typeof e] ?? null),
         smooth: true,
         symbol: 'circle',
-        symbolSize: 6
+        symbolSize: 6,
+        itemStyle: { color: config.color }
       })),
-      {
+      ...(hasTotalScore ? [{
         name: '总分',
         type: 'line' as const,
-        data: studentTrend.value.map(e => e.total_score || null),
+        data: studentTrend.value.map(e => e.total_score ?? null),
         smooth: true,
-        lineStyle: { width: 3 },
+        lineStyle: { width: 3, color: '#3b82f6' },
         symbol: 'circle',
-        symbolSize: 8
-      }
+        symbolSize: 8,
+        itemStyle: { color: '#3b82f6' }
+      }] : []),
+      ...(hasTotalScoreAssigned ? [{
+        name: '赋分总分',
+        type: 'line' as const,
+        data: studentTrend.value.map(e => e.total_score_assigned ?? null),
+        smooth: true,
+        lineStyle: { width: 3, color: '#06b6d4' },
+        symbol: 'circle',
+        symbolSize: 8,
+        itemStyle: { color: '#06b6d4' }
+      }] : [])
     ]
   }
 })
@@ -699,6 +853,9 @@ const loadExamAnalysis = async () => {
     ])
     examOverview.value = overviewRes.data
     scoreDistribution.value = distributionRes.data
+    if (distributionRes.data?.distributions?.length && distributionRes.data.distributions[0]) {
+      selectedDistributionSubject.value = distributionRes.data.distributions[0].subject
+    }
     examRanking.value = rankingRes.data
     examClassComparison.value = comparisonRes.data
     examPassRate.value = passRateRes.data

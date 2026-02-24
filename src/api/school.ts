@@ -422,9 +422,20 @@ export interface StudentScoreTrend {
   exam_name: string
   exam_date: string
   total_score: number | null
+  total_score_assigned: number | null
   chinese: number | null
   math: number | null
   english: number | null
+  physics: number | null
+  history: number | null
+  chemistry: number | null
+  chemistry_assigned: number | null
+  biology: number | null
+  biology_assigned: number | null
+  politics: number | null
+  politics_assigned: number | null
+  geography: number | null
+  geography_assigned: number | null
 }
 
 export interface ExamComparison {
