@@ -239,6 +239,7 @@ export interface StudentQueryParams {
   page?: number
   page_size?: number
   class_id?: string
+  school_id?: string
   name?: string
 }
 
@@ -527,6 +528,7 @@ export const getStudents = (params?: StudentQueryParams) => {
   if (params?.page) queryParams.append('page', params.page.toString())
   if (params?.page_size) queryParams.append('page_size', params.page_size.toString())
   if (params?.class_id) queryParams.append('class_id', params.class_id)
+  if (params?.school_id) queryParams.append('school_id', params.school_id)
   if (params?.name) queryParams.append('name', params.name)
   const queryString = queryParams.toString()
   return apiClient.get<PaginatedStudentResponse>(queryString ? `/school/student/?${queryString}` : '/school/student/')

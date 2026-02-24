@@ -362,7 +362,7 @@
         </el-select>
         <el-select v-model="subjectFilter.subject" placeholder="选择科目" :disabled="!subjectFilter.exam_id"
           @change="loadSubjectAnalysis">
-          <el-option v-for="subject in subjects" :key="subject" :label="subject" :value="subject" />
+          <el-option v-for="subject in examSubjects" :key="subject" :label="subject" :value="subject" />
         </el-select>
       </div>
 
@@ -448,7 +448,7 @@ import {
 
 use([CanvasRenderer, BarChart, LineChart, PieChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent])
 
-const subjects = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '政治', '地理']
+const examSubjects = ref<string[]>([])
 
 const schools = ref<SchoolResponse[]>([])
 const allClasses = ref<ClassResponse[]>([])
@@ -920,8 +920,24 @@ const handleTrendClassChange = async () => {
   }
 
   try {
-    const response = await getStudents({ class_id: trendFilter.class_id, page_size: 100 })
-    trendStudents.value = response.data.items || []
+    const allStudents: StudentResponse[] = []
+    let page = 1
+    const pageSize = 100
+    let hasMore = true
+
+    while (hasMore) {
+      const response = await getStudents({ class_id: trendFilter.class_id, page, page_size: pageSize })
+      const items = response.data.items || []
+      allStudents.push(...items)
+      
+      if (items.length < pageSize) {
+        hasMore = false
+      } else {
+        page++
+      }
+    }
+
+    trendStudents.value = allStudents
   } catch (error) {
     console.error('加载学生失败:', error)
     ElMessage.error('加载学生失败')
@@ -947,14 +963,27 @@ const loadStudentTrend = async () => {
 const handleSubjectSchoolChange = () => {
   subjectFilter.exam_id = ''
   subjectFilter.subject = ''
+  examSubjects.value = []
   subjectStats.value = null
   subjectError.value = ''
 }
 
-const handleSubjectExamChange = () => {
+const handleSubjectExamChange = async () => {
   subjectFilter.subject = ''
   subjectStats.value = null
   subjectError.value = ''
+  examSubjects.value = []
+
+  if (!subjectFilter.exam_id) return
+
+  try {
+    const response = await getScoreDistribution(subjectFilter.exam_id)
+    if (response.data?.distributions?.length) {
+      examSubjects.value = response.data.distributions.map(d => d.subject)
+    }
+  } catch (error) {
+    console.error('加载科目列表失败:', error)
+  }
 }
 
 const loadSubjectAnalysis = async () => {

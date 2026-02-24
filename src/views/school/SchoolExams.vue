@@ -35,7 +35,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column label="ID" width="280">
+        <el-table-column label="ID" width="160">
           <template #default="{ row }">
             <el-tooltip :content="row.id" placement="top">
               <span class="truncate cursor-pointer text-blue-600 hover:text-blue-800" @click="copyToClipboard(row.id)">
@@ -104,42 +104,71 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showScoresDialog" title="考试成绩" width="900px" :fullscreen="isMobile" class="custom-dialog">
-      <el-table :data="examScores" style="width: 100%" :stripe="true" v-loading="scoresLoading" max-height="400">
-        <el-table-column label="学生" width="120">
+    <el-dialog v-model="showScoresDialog" title="考试成绩" width="950px" :fullscreen="isMobile" class="custom-dialog">
+      <el-table :data="examScores" style="width: 100%" :stripe="true" v-loading="scoresLoading" max-height="400" border size="small">
+        <el-table-column label="学生" min-width="80" fixed>
           <template #default="{ row }">
             {{ getStudentName(row.student_id) }}
           </template>
         </el-table-column>
-        <el-table-column prop="chinese" label="语文" width="70">
-          <template #default="{ row }">{{ row.chinese ?? '-' }}</template>
+        <el-table-column label="主科(150)" align="center">
+          <el-table-column prop="chinese" label="语文" min-width="50" align="center">
+            <template #default="{ row }">{{ row.chinese ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="math" label="数学" min-width="50" align="center">
+            <template #default="{ row }">{{ row.math ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="english" label="英语" min-width="50" align="center">
+            <template #default="{ row }">{{ row.english ?? '-' }}</template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column prop="math" label="数学" width="70">
-          <template #default="{ row }">{{ row.math ?? '-' }}</template>
+        <el-table-column label="理科(100)" align="center">
+          <el-table-column prop="physics" label="物理" min-width="45" align="center">
+            <template #default="{ row }">{{ row.physics ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="chemistry" label="化学" min-width="45" align="center">
+            <template #default="{ row }">{{ row.chemistry ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="chemistry_assigned" label="化赋" min-width="45" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.chemistry_assigned ?? '-' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="biology" label="生物" min-width="45" align="center">
+            <template #default="{ row }">{{ row.biology ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="biology_assigned" label="生赋" min-width="45" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.biology_assigned ?? '-' }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column prop="english" label="英语" width="70">
-          <template #default="{ row }">{{ row.english ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="physics" label="物理" width="70">
-          <template #default="{ row }">{{ row.physics ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="chemistry" label="化学" width="70">
-          <template #default="{ row }">{{ row.chemistry ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="biology" label="生物" width="70">
-          <template #default="{ row }">{{ row.biology ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="history" label="历史" width="70">
-          <template #default="{ row }">{{ row.history ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="politics" label="政治" width="70">
-          <template #default="{ row }">{{ row.politics ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="geography" label="地理" width="70">
-          <template #default="{ row }">{{ row.geography ?? '-' }}</template>
+        <el-table-column label="文科(100)" align="center">
+          <el-table-column prop="history" label="历史" min-width="45" align="center">
+            <template #default="{ row }">{{ row.history ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="politics" label="政治" min-width="45" align="center">
+            <template #default="{ row }">{{ row.politics ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="politics_assigned" label="政赋" min-width="45" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.politics_assigned ?? '-' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="geography" label="地理" min-width="45" align="center">
+            <template #default="{ row }">{{ row.geography ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="geography_assigned" label="地赋" min-width="45" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.geography_assigned ?? '-' }}</span></template>
+          </el-table-column>
         </el-table-column>
       </el-table>
       <el-empty v-if="examScores.length === 0 && !scoresLoading" description="暂无成绩数据" />
+      <div class="flex justify-end mt-4" v-if="scoreTotal > 0">
+        <el-pagination
+          v-model:current-page="scorePage"
+          v-model:page-size="scorePageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="scoreTotal"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handleScorePageChange"
+          @size-change="handleScoreSizeChange"
+        />
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -154,7 +183,7 @@ import {
   updateExam,
   deleteExam,
   getSchools,
-  getExamScores,
+  getScores,
   getStudents,
   type ExamResponse,
   type SchoolResponse,
@@ -170,6 +199,10 @@ const exams = ref<ExamResponse[]>([])
 const schools = ref<SchoolResponse[]>([])
 const students = ref<StudentResponse[]>([])
 const examScores = ref<ScoreResponse[]>([])
+const currentExamId = ref('')
+const scorePage = ref(1)
+const scorePageSize = ref(10)
+const scoreTotal = ref(0)
 const loading = ref(false)
 const scoresLoading = ref(false)
 const submitLoading = ref(false)
@@ -245,10 +278,30 @@ const loadSchools = async () => {
   }
 }
 
-const loadStudents = async () => {
+const loadStudents = async (schoolId?: string) => {
   try {
-    const response = await getStudents()
-    students.value = response.data.items || []
+    const allStudents: StudentResponse[] = []
+    let page = 1
+    const pageSize = 100
+    let hasMore = true
+
+    while (hasMore) {
+      const params: { page: number; page_size: number; school_id?: string } = { page, page_size: pageSize }
+      if (schoolId) {
+        params.school_id = schoolId
+      }
+      const response = await getStudents(params)
+      const items = response.data.items || []
+      allStudents.push(...items)
+      
+      if (items.length < pageSize) {
+        hasMore = false
+      } else {
+        page++
+      }
+    }
+
+    students.value = allStudents
   } catch (error) {
     console.error('加载学生失败:', error)
   }
@@ -286,16 +339,41 @@ const handleEdit = (row: ExamResponse) => {
 
 const handleViewScores = async (row: ExamResponse) => {
   showScoresDialog.value = true
+  currentExamId.value = row.id
+  scorePage.value = 1
+  await loadExamScores()
+  if (students.value.length === 0) {
+    loadStudents(row.school_id)
+  }
+}
+
+const loadExamScores = async () => {
   scoresLoading.value = true
   try {
-    const response = await getExamScores(row.id)
-    examScores.value = response.data
+    const response = await getScores({
+      exam_id: currentExamId.value,
+      page: scorePage.value,
+      page_size: scorePageSize.value
+    })
+    examScores.value = response.data.items
+    scoreTotal.value = response.data.total
   } catch (error) {
     console.error('加载成绩失败:', error)
     ElMessage.error('加载成绩失败')
   } finally {
     scoresLoading.value = false
   }
+}
+
+const handleScorePageChange = (page: number) => {
+  scorePage.value = page
+  loadExamScores()
+}
+
+const handleScoreSizeChange = (size: number) => {
+  scorePageSize.value = size
+  scorePage.value = 1
+  loadExamScores()
 }
 
 const handleSubmit = async () => {

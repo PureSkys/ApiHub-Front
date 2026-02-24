@@ -11,11 +11,6 @@
         <el-select v-model="filterStudentId" placeholder="筛选学生" clearable filterable class="w-44" @change="handleFilterChange">
           <el-option v-for="student in students" :key="student.id" :label="student.name" :value="student.id" />
         </el-select>
-        <el-input v-model="searchKeyword" placeholder="搜索学生姓名" clearable class="w-40">
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
         <el-button @click="resetFilters" size="default">
           <el-icon><Refresh /></el-icon>
           重置
@@ -46,7 +41,7 @@
     <el-card class="shadow-sm rounded-2xl border-0 transition-all duration-300 hover:shadow-md">
       <el-table
         ref="tableRef"
-        :data="filteredScores"
+        :data="scores"
         style="width: 100%"
         :stripe="true"
         :border="false"
@@ -54,7 +49,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column label="ID" width="280">
+        <el-table-column label="ID" width="160">
           <template #default="{ row }">
             <el-tooltip :content="row.id" placement="top">
               <span class="truncate cursor-pointer text-blue-600 hover:text-blue-800" @click="copyToClipboard(row.id)">
@@ -156,7 +151,18 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="filteredScores.length === 0 && !loading" description="暂无成绩数据" />
+      <el-empty v-if="scores.length === 0 && !loading" description="暂无成绩数据" />
+      <div class="flex justify-end mt-4" v-if="total > 0">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="showAddDialog" :title="isEdit ? '编辑成绩' : '添加成绩'" width="600px" :fullscreen="isMobile" class="custom-dialog" :close-on-click-modal="false" destroy-on-close>
@@ -376,7 +382,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Plus, Delete, Upload, Download, Search, Refresh } from '@element-plus/icons-vue'
+import { Plus, Delete, Upload, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getScores,
@@ -415,6 +421,9 @@ const students = ref<StudentResponse[]>([])
 const exams = ref<ExamResponse[]>([])
 const classes = ref<ClassResponse[]>([])
 const schools = ref<SchoolResponse[]>([])
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const loading = ref(false)
 const submitLoading = ref(false)
 const batchSubmitLoading = ref(false)
@@ -426,12 +435,11 @@ const batchFormRef = ref<FormInstance>()
 const selectedIds = ref<string[]>([])
 const tableRef = ref<any>(null)
 
-const defaultFilterState = { schoolId: '', examId: '', studentId: '', keyword: '' }
+const defaultFilterState = { schoolId: '', examId: '', studentId: '' }
 const savedFilter = loadFilterState(FILTER_PAGE_KEY, defaultFilterState)
 const filterSchoolId = ref(savedFilter.schoolId)
 const filterExamId = ref(savedFilter.examId)
 const filterStudentId = ref(savedFilter.studentId)
-const searchKeyword = ref(savedFilter.keyword)
 
 const form = reactive({
   student_id: '',
@@ -474,24 +482,6 @@ const rules: FormRules = {
   ]
 }
 
-const filteredScores = computed(() => {
-  let result = scores.value
-  if (filterExamId.value) {
-    result = result.filter(s => s.exam_id === filterExamId.value)
-  }
-  if (filterStudentId.value) {
-    result = result.filter(s => s.student_id === filterStudentId.value)
-  }
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    const matchedStudentIds = students.value
-      .filter(st => st.name.toLowerCase().includes(keyword))
-      .map(st => st.id)
-    result = result.filter(s => matchedStudentIds.includes(s.student_id))
-  }
-  return result
-})
-
 const filteredExamsForFilter = computed(() => {
   if (!filterSchoolId.value) return []
   return exams.value.filter(e => e.school_id === filterSchoolId.value)
@@ -499,20 +489,23 @@ const filteredExamsForFilter = computed(() => {
 
 const handleSchoolFilterChange = () => {
   filterExamId.value = ''
+  currentPage.value = 1
   saveCurrentFilter()
+  loadScores()
 }
 
 const handleFilterChange = () => {
+  currentPage.value = 1
   clearSelection()
   saveCurrentFilter()
+  loadScores()
 }
 
 const saveCurrentFilter = () => {
   saveFilterState(FILTER_PAGE_KEY, {
     schoolId: filterSchoolId.value,
     examId: filterExamId.value,
-    studentId: filterStudentId.value,
-    keyword: searchKeyword.value
+    studentId: filterStudentId.value
   })
 }
 
@@ -520,12 +513,15 @@ const resetFilters = () => {
   filterSchoolId.value = ''
   filterExamId.value = ''
   filterStudentId.value = ''
-  searchKeyword.value = ''
+  currentPage.value = 1
   clearFilterState(FILTER_PAGE_KEY)
+  loadScores()
 }
 
-watch([filterSchoolId, filterExamId, filterStudentId, searchKeyword], () => {
+watch([filterExamId, filterStudentId], () => {
+  currentPage.value = 1
   saveCurrentFilter()
+  loadScores()
 })
 
 const filteredGradesForBatch = computed(() => {
@@ -570,25 +566,58 @@ const getScoreClass = (score: number | null, maxScore: number = 150) => {
 const loadScores = async () => {
   try {
     loading.value = true
-    const response = await getScores({ page_size: 100 })
-    console.log('Score API response:', response)
-    console.log('Response data:', response.data)
+    const params: { page: number; page_size: number; exam_id?: string; student_id?: string } = {
+      page: currentPage.value,
+      page_size: pageSize.value
+    }
+    if (filterExamId.value) {
+      params.exam_id = filterExamId.value
+    }
+    if (filterStudentId.value) {
+      params.student_id = filterStudentId.value
+    }
+    const response = await getScores(params)
     scores.value = response.data.items || []
+    total.value = response.data.total
   } catch (error: any) {
     console.error('加载成绩失败:', error)
-    console.error('Error response:', error.response)
-    console.error('Error message:', error.message)
     ElMessage.error('加载成绩失败: ' + (error.response?.data?.detail || error.message))
   } finally {
     loading.value = false
   }
 }
 
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadScores()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadScores()
+}
+
 const loadStudents = async () => {
   try {
-    const response = await getStudents({ page_size: 100 })
-    console.log('Students for scores:', response)
-    students.value = response.data.items || []
+    const allStudents: StudentResponse[] = []
+    let page = 1
+    const pageSize = 100
+    let hasMore = true
+
+    while (hasMore) {
+      const response = await getStudents({ page, page_size: pageSize })
+      const items = response.data.items || []
+      allStudents.push(...items)
+      
+      if (items.length < pageSize) {
+        hasMore = false
+      } else {
+        page++
+      }
+    }
+
+    students.value = allStudents
   } catch (error: any) {
     console.error('加载学生失败:', error)
   }

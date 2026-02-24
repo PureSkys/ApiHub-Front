@@ -279,8 +279,22 @@
           </div>
         </div>
         <div v-if="scoreDistribution && scoreDistribution.distributions.length > 0">
-          <p class="text-sm text-slate-500 mb-3">成绩分布</p>
-          <v-chart :option="distributionChartOption" style="height: 250px;" autoresize />
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-slate-500">各科成绩分布</p>
+            <el-radio-group v-model="distributionViewMode" size="small">
+              <el-radio-button value="stacked">堆叠图</el-radio-button>
+              <el-radio-button value="single">单科详情</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div v-if="distributionViewMode === 'stacked'">
+            <v-chart :option="distributionStackedChartOption" style="height: 300px;" autoresize />
+          </div>
+          <div v-else class="space-y-4">
+            <el-select v-model="selectedDistributionSubject" placeholder="选择科目" class="w-40 mb-2">
+              <el-option v-for="d in scoreDistribution.distributions" :key="d.subject" :label="d.subject" :value="d.subject" />
+            </el-select>
+            <v-chart :option="distributionSingleChartOption" style="height: 220px;" autoresize />
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -348,6 +362,9 @@ const examStatsLoading = ref(false)
 const examStatsTitle = ref('')
 const examStats = ref<ExamOverviewStats | null>(null)
 const scoreDistribution = ref<SubjectScoreDistribution | null>(null)
+
+const distributionViewMode = ref<'stacked' | 'single'>('stacked')
+const selectedDistributionSubject = ref('')
 
 const schoolClassData = computed(() => {
   const schoolMap = new Map<string, { name: string; count: number }>()
@@ -453,65 +470,102 @@ const examChartOption = computed(() => ({
   }]
 }))
 
-const distributionChartOption = computed(() => {
+const distributionStackedChartOption = computed(() => {
   if (!scoreDistribution.value?.distributions?.length) return {}
 
-  const ranges = [
-    { value: 0, name: '0-60分' },
-    { value: 0, name: '60-70分' },
-    { value: 0, name: '70-80分' },
-    { value: 0, name: '80-90分' },
-    { value: 0, name: '90-100分' },
-    { value: 0, name: '100-150分' }
-  ]
-
-  scoreDistribution.value.distributions.forEach(item => {
-    ranges[0]!.value += item.range_0_60
-    ranges[1]!.value += item.range_60_70
-    ranges[2]!.value += item.range_70_80
-    ranges[3]!.value += item.range_80_90
-    ranges[4]!.value += item.range_90_100
-    ranges[5]!.value += item.range_100_150
-  })
-
-  const data = ranges.filter(d => d.value > 0)
+  const distributions = scoreDistribution.value.distributions
+  const subjects = distributions.map(d => d.subject)
+  const rangeLabels = ['0-60分', '60-70分', '70-80分', '80-90分', '90-100分', '100-150分']
+  const rangeKeys = ['range_0_60', 'range_60_70', 'range_70_80', 'range_80_90', 'range_90_100', 'range_100_150'] as const
+  const colors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
 
   return {
     tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c}人 ({d}%)'
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any[]) => {
+        let result = `<strong>${params[0].axisValue}</strong><br/>`
+        let total = 0
+        params.forEach((p: any) => {
+          if (p.value > 0) {
+            result += `${p.marker} ${p.seriesName}: ${p.value}人<br/>`
+            total += p.value
+          }
+        })
+        result += `<strong>合计: ${total}人</strong>`
+        return result
+      }
     },
     legend: {
+      data: rangeLabels,
+      top: '3%',
+      itemGap: 12
+    },
+    grid: { left: '3%', right: '4%', top: '15%', bottom: '8%', containLabel: true },
+    xAxis: { type: 'category', data: subjects, axisLabel: { interval: 0 } },
+    yAxis: { type: 'value', name: '人数', nameGap: 15 },
+    series: rangeKeys.map((key, index) => ({
+      name: rangeLabels[index],
+      type: 'bar',
+      stack: 'total',
+      data: distributions.map(d => d[key]),
+      itemStyle: { color: colors[index] },
+      emphasis: { focus: 'series' },
+      label: {
+        show: true,
+        position: 'inside',
+        formatter: (params: any) => params.value > 0 ? params.value : '',
+        fontSize: 10
+      }
+    }))
+  }
+})
+
+const distributionSingleChartOption = computed(() => {
+  if (!scoreDistribution.value?.distributions?.length) return {}
+
+  const subject = selectedDistributionSubject.value || scoreDistribution.value.distributions[0]?.subject || ''
+  const distribution = scoreDistribution.value.distributions.find(d => d.subject === subject)
+  if (!distribution) return {}
+
+  const data = [
+    { value: distribution.range_0_60, name: '0-60分' },
+    { value: distribution.range_60_70, name: '60-70分' },
+    { value: distribution.range_70_80, name: '70-80分' },
+    { value: distribution.range_80_90, name: '80-90分' },
+    { value: distribution.range_90_100, name: '90-100分' },
+    { value: distribution.range_100_150, name: '100-150分' }
+  ].filter(d => d.value > 0)
+
+  const total = data.reduce((sum, d) => sum + d.value, 0)
+
+  return {
+    tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
+    legend: {
       bottom: '5%',
-      left: 'center'
+      left: 'center',
+      itemGap: 15
+    },
+    title: {
+      text: `${subject}成绩分布`,
+      subtext: `共${total}人`,
+      left: 'center',
+      top: '3%',
+      textStyle: { fontSize: 14, fontWeight: 'bold' },
+      subtextStyle: { fontSize: 12, color: '#64748b' }
     },
     series: [{
       name: '成绩分布',
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['35%', '55%'],
+      center: ['50%', '50%'],
       avoidLabelOverlap: false,
-      itemStyle: {
-        borderRadius: 10,
-        borderColor: '#fff',
-        borderWidth: 2
-      },
-      label: {
-        show: true,
-        formatter: '{b}: {c}人'
-      },
-      emphasis: {
-        label: {
-          show: true,
-          fontSize: 14,
-          fontWeight: 'bold'
-        }
-      },
+      itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+      label: { show: true, formatter: '{b}: {c}人\n({d}%)', fontSize: 11 },
+      labelLine: { length: 10, length2: 10 },
       data: data.map((item, index) => ({
-        value: item.value,
-        name: item.name,
-        itemStyle: {
-          color: ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'][index]
-        }
+        ...item,
+        itemStyle: { color: ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'][index] }
       }))
     }]
   }
@@ -586,6 +640,9 @@ const viewExamStats = async (examId: string) => {
     ])
     examStats.value = overviewRes.data
     scoreDistribution.value = distributionRes.data
+    if (distributionRes.data?.distributions?.length && distributionRes.data.distributions[0]) {
+      selectedDistributionSubject.value = distributionRes.data.distributions[0].subject
+    }
   } catch (error) {
     console.error('加载考试统计失败:', error)
     ElMessage.error('加载考试统计失败')

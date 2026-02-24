@@ -8,7 +8,7 @@
         <el-select v-model="filterClassId" placeholder="筛选班级" clearable class="w-44" :disabled="!filterSchoolId">
           <el-option v-for="cls in filteredClassesForFilter" :key="cls.id" :label="cls.name" :value="cls.id" />
         </el-select>
-        <el-input v-model="searchKeyword" placeholder="搜索学生姓名/学号" clearable class="w-48" @input="handleSearch">
+        <el-input v-model="searchKeyword" placeholder="搜索学生姓名" clearable class="w-48" @input="handleSearch">
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
@@ -43,7 +43,7 @@
     <el-card class="shadow-sm rounded-2xl border-0 transition-all duration-300 hover:shadow-md">
       <el-table
         ref="tableRef"
-        :data="filteredStudents"
+        :data="students"
         style="width: 100%"
         :stripe="true"
         :border="false"
@@ -51,7 +51,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column label="ID" width="280">
+        <el-table-column label="ID" width="200">
           <template #default="{ row }">
             <el-tooltip :content="row.id" placement="top">
               <span class="truncate cursor-pointer text-blue-600 hover:text-blue-800" @click="copyToClipboard(row.id)">
@@ -85,7 +85,18 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="filteredStudents.length === 0 && !loading" description="暂无学生数据" />
+      <el-empty v-if="students.length === 0 && !loading" description="暂无学生数据" />
+      <div class="flex justify-end mt-4" v-if="total > 0">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="showAddDialog" :title="isEdit ? '编辑学生' : '添加学生'" width="500px" :fullscreen="isMobile" class="custom-dialog" :close-on-click-modal="false" destroy-on-close>
@@ -339,6 +350,9 @@ const classes = ref<ClassResponse[]>([])
 const schools = ref<SchoolResponse[]>([])
 const exams = ref<ExamResponse[]>([])
 const scores = ref<ScoreResponse[]>([])
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const loading = ref(false)
 const scoresLoading = ref(false)
 const submitLoading = ref(false)
@@ -418,35 +432,18 @@ const filteredClassesForFilter = computed(() => {
   return classes.value.filter(c => c.school_id === filterSchoolId.value)
 })
 
-const filteredStudents = computed(() => {
-  let result = students.value
-  
-  if (filterClassId.value) {
-    result = result.filter(s => s.class_id === filterClassId.value)
-  } else if (filterSchoolId.value) {
-    const classIds = classes.value.filter(c => c.school_id === filterSchoolId.value).map(c => c.id)
-    result = result.filter(s => classIds.includes(s.class_id))
-  }
-  
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(s => 
-      s.name.toLowerCase().includes(keyword) || 
-      s.student_number.toLowerCase().includes(keyword)
-    )
-  }
-  
-  return result
-})
-
 const handleSchoolFilterChange = () => {
   filterClassId.value = ''
+  currentPage.value = 1
   clearSelection()
   saveCurrentFilter()
+  loadStudents()
 }
 
 const handleSearch = () => {
+  currentPage.value = 1
   saveCurrentFilter()
+  loadStudents()
 }
 
 const saveCurrentFilter = () => {
@@ -461,11 +458,15 @@ const resetFilters = () => {
   filterSchoolId.value = ''
   filterClassId.value = ''
   searchKeyword.value = ''
+  currentPage.value = 1
   clearFilterState(FILTER_PAGE_KEY)
+  loadStudents()
 }
 
-watch([filterSchoolId, filterClassId], () => {
+watch([filterClassId], () => {
+  currentPage.value = 1
   saveCurrentFilter()
+  loadStudents()
 })
 
 const copyToClipboard = (text: string) => {
@@ -568,18 +569,38 @@ const calculateMinTotal = (scores: any[]): number => {
 const loadStudents = async () => {
   try {
     loading.value = true
-    const response = await getStudents({ page_size: 100 })
-    console.log('Student API response:', response)
-    console.log('Response data:', response.data)
+    const params: { page: number; page_size: number; school_id?: string; class_id?: string; name?: string } = {
+      page: currentPage.value,
+      page_size: pageSize.value
+    }
+    if (filterClassId.value) {
+      params.class_id = filterClassId.value
+    } else if (filterSchoolId.value) {
+      params.school_id = filterSchoolId.value
+    }
+    if (searchKeyword.value) {
+      params.name = searchKeyword.value
+    }
+    const response = await getStudents(params)
     students.value = response.data.items || []
+    total.value = response.data.total
   } catch (error: any) {
     console.error('加载学生失败:', error)
-    console.error('Error response:', error.response)
-    console.error('Error message:', error.message)
     ElMessage.error('加载学生失败: ' + (error.response?.data?.detail || error.message))
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadStudents()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadStudents()
 }
 
 const loadClasses = async () => {
