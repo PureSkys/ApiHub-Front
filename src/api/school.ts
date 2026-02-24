@@ -44,6 +44,17 @@ export interface ClassUpdate {
   description?: string
 }
 
+export interface ClassBatchItem {
+  name: string
+  grade?: string
+  description?: string
+}
+
+export interface ClassBatchCreate {
+  school_id: string
+  classes: ClassBatchItem[]
+}
+
 export interface StudentResponse {
   id: string
   name: string
@@ -66,17 +77,6 @@ export interface StudentUpdate {
   gender?: string
   student_number?: string
   class_id?: string
-}
-
-export interface ClassBatchItem {
-  name: string
-  grade?: string
-  description?: string
-}
-
-export interface ClassBatchCreate {
-  school_id: string
-  classes: ClassBatchItem[]
 }
 
 export interface StudentBatchItem {
@@ -199,6 +199,87 @@ export interface SchoolAdminUpdate {
   is_active?: boolean
 }
 
+export interface OperationLogResponse {
+  id: string
+  user_id: string
+  user_type: string
+  action: string
+  resource_type: string
+  resource_id: string | null
+  detail: string | null
+  ip_address: string | null
+  created_at: string
+}
+
+export interface PaginatedStudentResponse {
+  items: StudentResponse[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface PaginatedScoreResponse {
+  items: ScoreResponse[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface PaginatedLogResponse {
+  items: OperationLogResponse[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface StudentQueryParams {
+  page?: number
+  page_size?: number
+  class_id?: string
+  name?: string
+}
+
+export interface ScoreQueryParams {
+  page?: number
+  page_size?: number
+  exam_id?: string
+  student_id?: string
+}
+
+export interface OperationLogParams {
+  page?: number
+  page_size?: number
+  user_id?: string
+  action?: string
+  resource_type?: string
+}
+
+export interface SchoolOverviewStats {
+  school_id: string
+  school_name: string
+  total_classes: number
+  total_students: number
+  total_exams: number
+  male_count: number
+  female_count: number
+}
+
+export interface ClassDetailStats {
+  class_id: string
+  class_name: string
+  grade: string | null
+  school_id: string
+  school_name: string
+  total_students: number
+  male_count: number
+  female_count: number
+  latest_exam_avg: number | null
+  latest_exam_name: string | null
+}
+
 export interface ClassStats {
   class_id: string
   class_name: string
@@ -223,6 +304,118 @@ export interface SubjectStats {
   min_score_student: string | null
 }
 
+export interface ExamOverviewStats {
+  exam_id: string
+  exam_name: string
+  exam_date: string
+  exam_type: string | null
+  school_id: string
+  school_name: string
+  total_students: number
+  total_scores: number
+  avg_total_score: number | null
+  avg_total_score_assigned: number | null
+  highest_total_score: number | null
+  highest_total_score_assigned: number | null
+  lowest_total_score: number | null
+  lowest_total_score_assigned: number | null
+}
+
+export interface ScoreDistribution {
+  subject: string
+  range_0_60: number
+  range_60_70: number
+  range_70_80: number
+  range_80_90: number
+  range_90_100: number
+  range_100_150: number
+}
+
+export interface StudentRanking {
+  rank: number
+  student_id: string
+  student_name: string
+  class_name: string
+  total_score: number | null
+  total_score_assigned: number | null
+  chinese: number | null
+  math: number | null
+  english: number | null
+  physics: number | null
+  history: number | null
+  chemistry: number | null
+  chemistry_assigned: number | null
+  biology: number | null
+  biology_assigned: number | null
+  politics: number | null
+  politics_assigned: number | null
+  geography: number | null
+  geography_assigned: number | null
+}
+
+export interface ExamRanking {
+  exam_id: string
+  exam_name: string
+  rankings: StudentRanking[]
+}
+
+export interface SubjectComparison {
+  subject: string
+  avg_score: number | null
+  max_score: number | null
+  min_score: number | null
+  pass_rate: number | null
+  excellent_rate: number | null
+}
+
+export interface ClassSubjectComparison {
+  class_id: string
+  class_name: string
+  comparisons: SubjectComparison[]
+}
+
+export interface ClassComparison {
+  class_id: string
+  class_name: string
+  avg_total_score: number | null
+  avg_total_score_assigned: number | null
+  avg_chinese: number | null
+  avg_math: number | null
+  avg_english: number | null
+  avg_physics: number | null
+  avg_chemistry: number | null
+  avg_chemistry_assigned: number | null
+  avg_biology: number | null
+  avg_biology_assigned: number | null
+  avg_history: number | null
+  avg_politics: number | null
+  avg_politics_assigned: number | null
+  avg_geography: number | null
+  avg_geography_assigned: number | null
+  student_count: number
+}
+
+export interface ExamClassComparison {
+  exam_id: string
+  exam_name: string
+  classes: ClassComparison[]
+}
+
+export interface PassRateStats {
+  subject: string
+  total_count: number
+  pass_count: number
+  excellent_count: number
+  pass_rate: number
+  excellent_rate: number
+}
+
+export interface ExamPassRateStats {
+  exam_id: string
+  exam_name: string
+  subjects: PassRateStats[]
+}
+
 export interface StudentScoreTrend {
   student_id: string
   student_name: string
@@ -234,46 +427,32 @@ export interface StudentScoreTrend {
   english: number | null
 }
 
-export interface OperationLogResponse {
-  id: string
-  user_id: string
-  user_type: string
-  action: string
-  resource_type: string
-  resource_id: string | null
-  detail: string | null
-  ip_address: string | null
-  created_at: string
+export interface ExamComparison {
+  exam_id: string
+  exam_name: string
+  exam_date: string
+  avg_total_score: number | null
+  avg_chinese: number | null
+  avg_math: number | null
+  avg_english: number | null
+  avg_physics: number | null
+  avg_chemistry: number | null
+  avg_biology: number | null
+  avg_history: number | null
+  avg_politics: number | null
+  avg_geography: number | null
 }
 
-export interface PaginatedStudentsResponse {
-  items: StudentResponse[]
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
+export interface StudentExamComparison {
+  student_id: string
+  student_name: string
+  exams: ExamComparison[]
 }
 
-export interface PaginatedScoresResponse {
-  items: ScoreResponse[]
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-}
-
-export interface StudentQueryParams {
-  page?: number
-  page_size?: number
-  class_id?: string
-  name?: string
-}
-
-export interface ScoreQueryParams {
-  page?: number
-  page_size?: number
-  exam_id?: string
-  student_id?: string
+export interface SubjectScoreDistribution {
+  exam_id: string
+  exam_name: string
+  distributions: ScoreDistribution[]
 }
 
 export const getSchools = () => {
@@ -334,21 +513,12 @@ export const getClassStudents = (classId: string) => {
 
 export const getStudents = (params?: StudentQueryParams) => {
   const queryParams = new URLSearchParams()
-  if (params?.page) {
-    queryParams.append('page', params.page.toString())
-  }
-  if (params?.page_size) {
-    queryParams.append('page_size', params.page_size.toString())
-  }
-  if (params?.class_id) {
-    queryParams.append('class_id', params.class_id)
-  }
-  if (params?.name) {
-    queryParams.append('name', params.name)
-  }
+  if (params?.page) queryParams.append('page', params.page.toString())
+  if (params?.page_size) queryParams.append('page_size', params.page_size.toString())
+  if (params?.class_id) queryParams.append('class_id', params.class_id)
+  if (params?.name) queryParams.append('name', params.name)
   const queryString = queryParams.toString()
-  const url = queryString ? `/school/student/?${queryString}` : '/school/student/'
-  return apiClient.get<PaginatedStudentsResponse>(url)
+  return apiClient.get<PaginatedStudentResponse>(queryString ? `/school/student/?${queryString}` : '/school/student/')
 }
 
 export const getStudent = (studentId: string) => {
@@ -401,21 +571,12 @@ export const getExamScores = (examId: string) => {
 
 export const getScores = (params?: ScoreQueryParams) => {
   const queryParams = new URLSearchParams()
-  if (params?.page) {
-    queryParams.append('page', params.page.toString())
-  }
-  if (params?.page_size) {
-    queryParams.append('page_size', params.page_size.toString())
-  }
-  if (params?.exam_id) {
-    queryParams.append('exam_id', params.exam_id)
-  }
-  if (params?.student_id) {
-    queryParams.append('student_id', params.student_id)
-  }
+  if (params?.page) queryParams.append('page', params.page.toString())
+  if (params?.page_size) queryParams.append('page_size', params.page_size.toString())
+  if (params?.exam_id) queryParams.append('exam_id', params.exam_id)
+  if (params?.student_id) queryParams.append('student_id', params.student_id)
   const queryString = queryParams.toString()
-  const url = queryString ? `/school/score/?${queryString}` : '/school/score/'
-  return apiClient.get<PaginatedScoresResponse>(url)
+  return apiClient.get<PaginatedScoreResponse>(queryString ? `/school/score/?${queryString}` : '/school/score/')
 }
 
 export const getScore = (scoreId: string) => {
@@ -462,55 +623,66 @@ export const toggleSchoolAdmin = (adminId: string) => {
   return apiClient.put<SchoolAdminDetailResponse>(`/school/admin/${adminId}/toggle`)
 }
 
-export const getClassStats = (classId: string, examId: string) => {
+export const getOperationLogs = (params?: OperationLogParams) => {
+  const queryParams = new URLSearchParams()
+  if (params?.page) queryParams.append('page', params.page.toString())
+  if (params?.page_size) queryParams.append('page_size', params.page_size.toString())
+  if (params?.user_id) queryParams.append('user_id', params.user_id)
+  if (params?.action) queryParams.append('action', params.action)
+  if (params?.resource_type) queryParams.append('resource_type', params.resource_type)
+  const queryString = queryParams.toString()
+  return apiClient.get<PaginatedLogResponse>(queryString ? `/school/log/?${queryString}` : '/school/log/')
+}
+
+export const getUserLogs = (userId: string) => {
+  return apiClient.get<OperationLogResponse[]>(`/school/log/user/${userId}`)
+}
+
+export const getSchoolOverviewStats = (schoolId: string) => {
+  return apiClient.get<SchoolOverviewStats>(`/school/stats/school/${schoolId}/overview`)
+}
+
+export const getClassDetailStats = (classId: string) => {
+  return apiClient.get<ClassDetailStats>(`/school/stats/class/${classId}/detail`)
+}
+
+export const getClassExamStats = (classId: string, examId: string) => {
   return apiClient.get<ClassStats[]>(`/school/stats/class/${classId}/exam/${examId}`)
 }
 
+export const getClassSubjectComparison = (classId: string, examId: string) => {
+  return apiClient.get<ClassSubjectComparison>(`/school/stats/class/${classId}/exam/${examId}/comparison`)
+}
+
+export const getExamOverviewStats = (examId: string) => {
+  return apiClient.get<ExamOverviewStats>(`/school/stats/exam/${examId}/overview`)
+}
+
+export const getScoreDistribution = (examId: string) => {
+  return apiClient.get<SubjectScoreDistribution>(`/school/stats/exam/${examId}/distribution`)
+}
+
+export const getExamRanking = (examId: string, limit?: number) => {
+  const params = limit ? `?limit=${limit}` : ''
+  return apiClient.get<ExamRanking>(`/school/stats/exam/${examId}/ranking${params}`)
+}
+
+export const getExamClassComparison = (examId: string) => {
+  return apiClient.get<ExamClassComparison>(`/school/stats/exam/${examId}/class-comparison`)
+}
+
+export const getExamPassRate = (examId: string) => {
+  return apiClient.get<ExamPassRateStats>(`/school/stats/exam/${examId}/pass-rate`)
+}
+
 export const getSubjectStats = (examId: string, subject: string) => {
-  return apiClient.get<SubjectStats>(`/school/stats/exam/${examId}/subject/${subject}`)
+  return apiClient.get<SubjectStats>(`/school/stats/exam/${examId}/subject/${encodeURIComponent(subject)}`)
 }
 
 export const getStudentTrend = (studentId: string) => {
   return apiClient.get<StudentScoreTrend[]>(`/school/stats/student/${studentId}`)
 }
 
-export interface OperationLogParams {
-  page?: number
-  page_size?: number
-  user_id?: string
-  action?: string
-  resource_type?: string
-}
-
-export interface PaginatedOperationLogs {
-  items: OperationLogResponse[]
-  total: number
-  page: number
-  page_size: number
-}
-
-export const getOperationLogs = (params?: OperationLogParams) => {
-  const queryParams = new URLSearchParams()
-  if (params?.page) {
-    queryParams.append('page', params.page.toString())
-  }
-  if (params?.page_size) {
-    queryParams.append('page_size', params.page_size.toString())
-  }
-  if (params?.user_id) {
-    queryParams.append('user_id', params.user_id)
-  }
-  if (params?.action) {
-    queryParams.append('action', params.action)
-  }
-  if (params?.resource_type) {
-    queryParams.append('resource_type', params.resource_type)
-  }
-  const queryString = queryParams.toString()
-  const url = queryString ? `/school/log/?${queryString}` : '/school/log/'
-  return apiClient.get<PaginatedOperationLogs>(url)
-}
-
-export const getUserLogs = (userId: string) => {
-  return apiClient.get<OperationLogResponse[]>(`/school/log/user/${userId}`)
+export const getStudentExamComparison = (studentId: string) => {
+  return apiClient.get<StudentExamComparison>(`/school/stats/student/${studentId}/comparison`)
 }

@@ -1,13 +1,22 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-4">
-        <el-select v-model="filterSchoolId" placeholder="筛选学校" clearable class="w-48" @change="handleSchoolFilterChange">
+    <div class="flex justify-between items-center flex-wrap gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <el-select v-model="filterSchoolId" placeholder="筛选学校" clearable class="w-44" @change="handleSchoolFilterChange">
           <el-option v-for="school in schools" :key="school.id" :label="school.name" :value="school.id" />
         </el-select>
-        <el-select v-model="filterClassId" placeholder="筛选班级" clearable class="w-48" :disabled="!filterSchoolId">
+        <el-select v-model="filterClassId" placeholder="筛选班级" clearable class="w-44" :disabled="!filterSchoolId">
           <el-option v-for="cls in filteredClassesForFilter" :key="cls.id" :label="cls.name" :value="cls.id" />
         </el-select>
+        <el-input v-model="searchKeyword" placeholder="搜索学生姓名/学号" clearable class="w-48" @input="handleSearch">
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button @click="resetFilters" size="default">
+          <el-icon><Refresh /></el-icon>
+          重置
+        </el-button>
       </div>
       <div v-if="selectedIds.length > 0" class="flex items-center gap-3">
         <span class="text-slate-600">已选择 {{ selectedIds.length }} 项</span>
@@ -107,30 +116,97 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showScoresDialog" title="学生成绩" width="800px" :fullscreen="isMobile" class="custom-dialog">
-      <el-table :data="scores" style="width: 100%" :stripe="true" v-loading="scoresLoading" max-height="400">
-        <el-table-column label="考试" width="150">
+    <el-dialog v-model="showScoresDialog" title="学生成绩" width="1200px" :fullscreen="isMobile" class="custom-dialog">
+      <div v-if="scores.length > 0" class="mb-4 p-4 bg-slate-50 rounded-xl">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div class="text-center">
+            <p class="text-xs text-slate-500">考试次数</p>
+            <p class="text-xl font-bold text-blue-600">{{ scores.length }}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-500">平均总分(原始)</p>
+            <p class="text-xl font-bold text-green-600">{{ calculateAvgTotal(scores).toFixed(1) }}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-500">平均总分(赋分)</p>
+            <p class="text-xl font-bold text-cyan-600">{{ calculateAvgTotalAssigned(scores).toFixed(1) }}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-500">最高总分(原始)</p>
+            <p class="text-xl font-bold text-orange-600">{{ calculateMaxTotal(scores).toFixed(1) }}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-500">最高总分(赋分)</p>
+            <p class="text-xl font-bold text-orange-500">{{ calculateMaxTotalAssigned(scores).toFixed(1) }}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-500">最低总分(原始)</p>
+            <p class="text-xl font-bold text-purple-600">{{ calculateMinTotal(scores).toFixed(1) }}</p>
+          </div>
+        </div>
+      </div>
+      <el-table :data="scores" style="width: 100%" :stripe="true" v-loading="scoresLoading" max-height="400" border size="small">
+        <el-table-column label="考试" width="120" fixed>
           <template #default="{ row }">
             {{ getExamName(row.exam_id) }}
           </template>
         </el-table-column>
-        <el-table-column prop="chinese" label="语文" width="80">
-          <template #default="{ row }">{{ row.chinese ?? '-' }}</template>
+        <el-table-column label="主科(150)" align="center">
+          <el-table-column prop="chinese" label="语文" width="60" align="center">
+            <template #default="{ row }">{{ row.chinese ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="math" label="数学" width="60" align="center">
+            <template #default="{ row }">{{ row.math ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="english" label="英语" width="60" align="center">
+            <template #default="{ row }">{{ row.english ?? '-' }}</template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column prop="math" label="数学" width="80">
-          <template #default="{ row }">{{ row.math ?? '-' }}</template>
+        <el-table-column label="理科(100)" align="center">
+          <el-table-column prop="physics" label="物理" width="55" align="center">
+            <template #default="{ row }">{{ row.physics ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="chemistry" label="化学" width="55" align="center">
+            <template #default="{ row }">{{ row.chemistry ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="chemistry_assigned" label="化赋" width="55" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.chemistry_assigned ?? '-' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="biology" label="生物" width="55" align="center">
+            <template #default="{ row }">{{ row.biology ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="biology_assigned" label="生赋" width="55" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.biology_assigned ?? '-' }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column prop="english" label="英语" width="80">
-          <template #default="{ row }">{{ row.english ?? '-' }}</template>
+        <el-table-column label="文科(100)" align="center">
+          <el-table-column prop="history" label="历史" width="55" align="center">
+            <template #default="{ row }">{{ row.history ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="politics" label="政治" width="55" align="center">
+            <template #default="{ row }">{{ row.politics ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="politics_assigned" label="政赋" width="55" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.politics_assigned ?? '-' }}</span></template>
+          </el-table-column>
+          <el-table-column prop="geography" label="地理" width="55" align="center">
+            <template #default="{ row }">{{ row.geography ?? '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="geography_assigned" label="地赋" width="55" align="center">
+            <template #default="{ row }"><span class="text-blue-500">{{ row.geography_assigned ?? '-' }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column prop="physics" label="物理" width="80">
-          <template #default="{ row }">{{ row.physics ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="chemistry" label="化学" width="80">
-          <template #default="{ row }">{{ row.chemistry ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="biology" label="生物" width="80">
-          <template #default="{ row }">{{ row.biology ?? '-' }}</template>
+        <el-table-column label="总分" align="center" fixed="right">
+          <el-table-column label="原始" width="60" align="center">
+            <template #default="{ row }">
+              <span class="font-bold text-green-600">{{ calculateTotal(row) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="赋分" width="60" align="center">
+            <template #default="{ row }">
+              <span class="font-bold text-cyan-600">{{ calculateTotalAssigned(row) }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
       </el-table>
       <el-empty v-if="scores.length === 0 && !scoresLoading" description="暂无成绩数据" />
@@ -222,8 +298,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { Plus, Delete, Upload, Download, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getStudents,
@@ -240,7 +316,6 @@ import {
   type SchoolResponse,
   type ScoreResponse,
   type ExamResponse,
-  type PaginatedStudentsResponse,
   type BatchImportResult
 } from '@/api/school'
 import {
@@ -249,14 +324,16 @@ import {
   parseStudentExcel,
   type StudentTemplateRow
 } from '@/utils/excelTemplate'
+import { saveFilterState, loadFilterState, clearFilterState } from '@/utils/filterStorage'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
+
+const FILTER_PAGE_KEY = 'students'
 
 const isMobile = ref(false)
 const showAddDialog = ref(false)
 const showScoresDialog = ref(false)
 const showBatchDialog = ref(false)
 const showBatchResultDialog = ref(false)
-const uploadRef = ref<any>(null)
 const students = ref<StudentResponse[]>([])
 const classes = ref<ClassResponse[]>([])
 const schools = ref<SchoolResponse[]>([])
@@ -273,8 +350,12 @@ const formRef = ref<FormInstance>()
 const batchFormRef = ref<FormInstance>()
 const selectedIds = ref<string[]>([])
 const tableRef = ref<any>(null)
-const filterSchoolId = ref('')
-const filterClassId = ref('')
+
+const defaultFilterState = { schoolId: '', classId: '', keyword: '' }
+const savedFilter = loadFilterState(FILTER_PAGE_KEY, defaultFilterState)
+const filterSchoolId = ref(savedFilter.schoolId)
+const filterClassId = ref(savedFilter.classId)
+const searchKeyword = ref(savedFilter.keyword)
 
 const batchResult = reactive<BatchImportResult>({
   success_count: 0,
@@ -338,14 +419,53 @@ const filteredClassesForFilter = computed(() => {
 })
 
 const filteredStudents = computed(() => {
+  let result = students.value
+  
   if (filterClassId.value) {
-    return students.value.filter(s => s.class_id === filterClassId.value)
-  }
-  if (filterSchoolId.value) {
+    result = result.filter(s => s.class_id === filterClassId.value)
+  } else if (filterSchoolId.value) {
     const classIds = classes.value.filter(c => c.school_id === filterSchoolId.value).map(c => c.id)
-    return students.value.filter(s => classIds.includes(s.class_id))
+    result = result.filter(s => classIds.includes(s.class_id))
   }
-  return students.value
+  
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(s => 
+      s.name.toLowerCase().includes(keyword) || 
+      s.student_number.toLowerCase().includes(keyword)
+    )
+  }
+  
+  return result
+})
+
+const handleSchoolFilterChange = () => {
+  filterClassId.value = ''
+  clearSelection()
+  saveCurrentFilter()
+}
+
+const handleSearch = () => {
+  saveCurrentFilter()
+}
+
+const saveCurrentFilter = () => {
+  saveFilterState(FILTER_PAGE_KEY, {
+    schoolId: filterSchoolId.value,
+    classId: filterClassId.value,
+    keyword: searchKeyword.value
+  })
+}
+
+const resetFilters = () => {
+  filterSchoolId.value = ''
+  filterClassId.value = ''
+  searchKeyword.value = ''
+  clearFilterState(FILTER_PAGE_KEY)
+}
+
+watch([filterSchoolId, filterClassId], () => {
+  saveCurrentFilter()
 })
 
 const copyToClipboard = (text: string) => {
@@ -369,6 +489,80 @@ const getSchoolName = (schoolId: string) => {
 const getExamName = (examId: string) => {
   const exam = exams.value.find(e => e.id === examId)
   return exam?.name || '-'
+}
+
+const calculateTotal = (score: any): number | string => {
+  if (!score) return '-'
+  const total = (score.chinese || 0) + (score.math || 0) + (score.english || 0) +
+    (score.physics || 0) + (score.chemistry || 0) + (score.biology || 0) +
+    (score.history || 0) + (score.politics || 0) + (score.geography || 0)
+  return total > 0 ? total : '-'
+}
+
+const calculateTotalAssigned = (score: any): number | string => {
+  if (!score) return '-'
+  const total = (score.chinese || 0) + (score.math || 0) + (score.english || 0) +
+    (score.physics || 0) + (score.chemistry_assigned || score.chemistry || 0) + 
+    (score.biology_assigned || score.biology || 0) +
+    (score.history || 0) + (score.politics_assigned || score.politics || 0) + 
+    (score.geography_assigned || score.geography || 0)
+  return total > 0 ? total : '-'
+}
+
+const calculateAvgTotal = (scores: any[]): number => {
+  if (scores.length === 0) return 0
+  const totals = scores.map(s => {
+    return (s.chinese || 0) + (s.math || 0) + (s.english || 0) +
+      (s.physics || 0) + (s.chemistry || 0) + (s.biology || 0) +
+      (s.history || 0) + (s.politics || 0) + (s.geography || 0)
+  }).filter(t => t > 0)
+  if (totals.length === 0) return 0
+  return totals.reduce((a, b) => a + b, 0) / totals.length
+}
+
+const calculateAvgTotalAssigned = (scores: any[]): number => {
+  if (scores.length === 0) return 0
+  const totals = scores.map(s => {
+    return (s.chinese || 0) + (s.math || 0) + (s.english || 0) +
+      (s.physics || 0) + (s.chemistry_assigned || s.chemistry || 0) + 
+      (s.biology_assigned || s.biology || 0) +
+      (s.history || 0) + (s.politics_assigned || s.politics || 0) + 
+      (s.geography_assigned || s.geography || 0)
+  }).filter(t => t > 0)
+  if (totals.length === 0) return 0
+  return totals.reduce((a, b) => a + b, 0) / totals.length
+}
+
+const calculateMaxTotal = (scores: any[]): number => {
+  if (scores.length === 0) return 0
+  const totals = scores.map(s => {
+    return (s.chinese || 0) + (s.math || 0) + (s.english || 0) +
+      (s.physics || 0) + (s.chemistry || 0) + (s.biology || 0) +
+      (s.history || 0) + (s.politics || 0) + (s.geography || 0)
+  }).filter(t => t > 0)
+  return totals.length > 0 ? Math.max(...totals) : 0
+}
+
+const calculateMaxTotalAssigned = (scores: any[]): number => {
+  if (scores.length === 0) return 0
+  const totals = scores.map(s => {
+    return (s.chinese || 0) + (s.math || 0) + (s.english || 0) +
+      (s.physics || 0) + (s.chemistry_assigned || s.chemistry || 0) + 
+      (s.biology_assigned || s.biology || 0) +
+      (s.history || 0) + (s.politics_assigned || s.politics || 0) + 
+      (s.geography_assigned || s.geography || 0)
+  }).filter(t => t > 0)
+  return totals.length > 0 ? Math.max(...totals) : 0
+}
+
+const calculateMinTotal = (scores: any[]): number => {
+  if (scores.length === 0) return 0
+  const totals = scores.map(s => {
+    return (s.chinese || 0) + (s.math || 0) + (s.english || 0) +
+      (s.physics || 0) + (s.chemistry || 0) + (s.biology || 0) +
+      (s.history || 0) + (s.politics || 0) + (s.geography || 0)
+  }).filter(t => t > 0)
+  return totals.length > 0 ? Math.min(...totals) : 0
 }
 
 const loadStudents = async () => {
@@ -413,11 +607,6 @@ const loadExams = async () => {
   } catch (error) {
     console.error('加载考试失败:', error)
   }
-}
-
-const handleSchoolFilterChange = () => {
-  filterClassId.value = ''
-  clearSelection()
 }
 
 const handleSelectionChange = (selection: StudentResponse[]) => {

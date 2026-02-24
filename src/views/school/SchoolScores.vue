@@ -1,13 +1,25 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-4 flex-wrap">
-        <el-select v-model="filterExamId" placeholder="筛选考试" clearable class="w-48" @change="handleFilterChange">
-          <el-option v-for="exam in exams" :key="exam.id" :label="exam.name" :value="exam.id" />
+    <div class="flex justify-between items-center flex-wrap gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <el-select v-model="filterSchoolId" placeholder="选择学校" clearable class="w-44" @change="handleSchoolFilterChange">
+          <el-option v-for="school in schools" :key="school.id" :label="school.name" :value="school.id" />
         </el-select>
-        <el-select v-model="filterStudentId" placeholder="筛选学生" clearable filterable class="w-48" @change="handleFilterChange">
+        <el-select v-model="filterExamId" placeholder="筛选考试" clearable class="w-44" :disabled="!filterSchoolId" @change="handleFilterChange">
+          <el-option v-for="exam in filteredExamsForFilter" :key="exam.id" :label="exam.name" :value="exam.id" />
+        </el-select>
+        <el-select v-model="filterStudentId" placeholder="筛选学生" clearable filterable class="w-44" @change="handleFilterChange">
           <el-option v-for="student in students" :key="student.id" :label="student.name" :value="student.id" />
         </el-select>
+        <el-input v-model="searchKeyword" placeholder="搜索学生姓名" clearable class="w-40">
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button @click="resetFilters" size="default">
+          <el-icon><Refresh /></el-icon>
+          重置
+        </el-button>
       </div>
       <div v-if="selectedIds.length > 0" class="flex items-center gap-3">
         <span class="text-slate-600">已选择 {{ selectedIds.length }} 项</span>
@@ -164,49 +176,49 @@
         <el-divider content-position="left">主科成绩 (满分150分)</el-divider>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <el-form-item label="语文" prop="chinese">
-            <el-input-number v-model="form.chinese" :min="0" :max="150" :precision="1" class="w-full transition-all duration-300" placeholder="满分150" />
+            <el-input-number v-model="form.chinese" :min="0" :max="150" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="数学" prop="math">
-            <el-input-number v-model="form.math" :min="0" :max="150" :precision="1" class="w-full transition-all duration-300" placeholder="满分150" />
+            <el-input-number v-model="form.math" :min="0" :max="150" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="英语" prop="english">
-            <el-input-number v-model="form.english" :min="0" :max="150" :precision="1" class="w-full transition-all duration-300" placeholder="满分150" />
+            <el-input-number v-model="form.english" :min="0" :max="150" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
         </div>
         <el-divider content-position="left">理科成绩 (满分100分)</el-divider>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           <el-form-item label="物理" prop="physics">
-            <el-input-number v-model="form.physics" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.physics" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="化学" prop="chemistry">
-            <el-input-number v-model="form.chemistry" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.chemistry" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="化学赋分" prop="chemistry_assigned">
-            <el-input-number v-model="form.chemistry_assigned" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.chemistry_assigned" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="生物" prop="biology">
-            <el-input-number v-model="form.biology" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.biology" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="生物赋分" prop="biology_assigned">
-            <el-input-number v-model="form.biology_assigned" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.biology_assigned" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
         </div>
         <el-divider content-position="left">文科成绩 (满分100分)</el-divider>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           <el-form-item label="历史" prop="history">
-            <el-input-number v-model="form.history" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.history" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="政治" prop="politics">
-            <el-input-number v-model="form.politics" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.politics" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="政治赋分" prop="politics_assigned">
-            <el-input-number v-model="form.politics_assigned" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.politics_assigned" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="地理" prop="geography">
-            <el-input-number v-model="form.geography" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.geography" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
           <el-form-item label="地理赋分" prop="geography_assigned">
-            <el-input-number v-model="form.geography_assigned" :min="0" :max="100" :precision="1" class="w-full transition-all duration-300" placeholder="满分100" />
+            <el-input-number v-model="form.geography_assigned" :min="0" :max="100" :precision="1" :controls="false" class="w-full transition-all duration-300" />
           </el-form-item>
         </div>
       </el-form>
@@ -219,31 +231,25 @@
     </el-dialog>
 
     <el-dialog v-model="showBatchDialog" title="批量导入成绩" width="950px" :fullscreen="isMobile" class="custom-dialog" :close-on-click-modal="false" destroy-on-close>
-      <el-form :model="batchForm" :rules="batchRules" ref="batchFormRef" label-width="80px" class="px-2 md:px-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <el-form :model="batchForm" ref="batchFormRef" label-width="80px" class="px-2 md:px-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <el-form-item label="学校" prop="school_id">
             <el-select v-model="batchForm.school_id" placeholder="请选择学校" class="w-full transition-all duration-300" @change="handleBatchSchoolChange">
               <el-option v-for="school in schools" :key="school.id" :label="school.name" :value="school.id" />
             </el-select>
           </el-form-item>
-          <el-form-item label="班级" prop="class_ids">
-            <el-select v-model="batchForm.class_ids" multiple collapse-tags collapse-tags-tooltip placeholder="请选择班级" class="w-full transition-all duration-300" :disabled="!batchForm.school_id" @change="handleClassChange">
-              <el-option v-for="cls in filteredClassesForBatch" :key="cls.id" :label="cls.name" :value="cls.id" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="考试" prop="exam_id">
-            <el-select v-model="batchForm.exam_id" placeholder="请选择考试" class="w-full transition-all duration-300" :disabled="!batchForm.school_id">
-              <el-option v-for="exam in filteredExamsForBatch" :key="exam.id" :label="exam.name" :value="exam.id" />
+          <el-form-item label="年级" prop="grade">
+            <el-select v-model="batchForm.grade" placeholder="请选择年级" class="w-full transition-all duration-300" :disabled="!batchForm.school_id" @change="handleGradeChangeForTemplate">
+              <el-option v-for="grade in filteredGradesForBatch" :key="grade.value" :label="grade.label" :value="grade.value" />
             </el-select>
           </el-form-item>
         </div>
         <div class="flex gap-2 mb-4">
-          <el-button type="primary" plain size="small" @click="handleDownloadScoreTemplate" :disabled="!batchForm.exam_id || batchForm.class_ids.length === 0">
+          <el-button type="primary" plain size="small" @click="handleDownloadScoreTemplate" :disabled="!batchForm.school_id || !batchForm.grade">
             <el-icon><Download /></el-icon>
             下载成绩模板
           </el-button>
           <el-upload
-            ref="uploadRef"
             :auto-upload="false"
             :show-file-list="false"
             accept=".xlsx,.xls"
@@ -259,17 +265,27 @@
           <template #title>
             <div class="text-sm">
               <p class="font-semibold mb-2">导入说明：</p>
-              <p>1. 先选择学校，再选择要导入成绩的班级（可多选）</p>
-              <p>2. 选择考试后点击"下载成绩模板"获取学生名单</p>
-              <p>3. 成绩字段说明：</p>
-              <p class="pl-4 text-slate-500">• 主科（语文/数学/英语）：满分150分</p>
-              <p class="pl-4 text-slate-500">• 理科（物理/化学/生物）：满分100分</p>
-              <p class="pl-4 text-slate-500">• 文科（历史/政治/地理）：满分100分</p>
+              <p>1. 选择学校和年级后，点击"下载成绩模板"获取该年级所有学生名单</p>
+              <p>2. 成绩字段说明：</p>
+              <p class="pl-4 text-slate-500">• 主科（语文/数学/英语）：满分150分，及格线90分</p>
+              <p class="pl-4 text-slate-500">• 理科（物理/化学/生物）：满分100分，及格线60分</p>
+              <p class="pl-4 text-slate-500">• 文科（历史/政治/地理）：满分100分，及格线60分</p>
               <p class="pl-4 text-slate-500">• 赋分字段为选填，用于新高考赋分制</p>
-              <p>4. 填写成绩后上传Excel文件完成导入</p>
+              <p>3. 填写成绩后上传Excel文件完成导入</p>
             </div>
           </template>
         </el-alert>
+        <div v-if="previewScores.length > 0" class="mb-4 p-4 bg-orange-50 rounded-xl">
+          <div class="flex items-center gap-4">
+            <span class="text-sm font-semibold text-slate-700">选择考试：</span>
+            <el-select v-model="batchForm.exam_id" placeholder="请选择要导入的考试" class="flex-1">
+              <el-option v-for="exam in filteredExamsForBatch" :key="exam.id" :label="exam.name" :value="exam.id" />
+            </el-select>
+            <el-button type="primary" @click="handleScoreBatchSubmit" :loading="batchSubmitLoading" :disabled="!batchForm.exam_id">
+              确认导入
+            </el-button>
+          </div>
+        </div>
         <el-divider content-position="left">成绩预览</el-divider>
         <el-table :data="previewScores" style="width: 100%" max-height="300" :stripe="true" border size="small">
           <el-table-column prop="student_name" label="学生" width="80" fixed />
@@ -359,8 +375,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { Plus, Delete, Upload, Download, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getScores,
@@ -370,16 +386,14 @@ import {
   deleteScore,
   getStudents,
   getExams,
-  getExamScores,
   getClasses,
   getSchools,
+  getClassStudents,
   type ScoreResponse,
   type StudentResponse,
   type ExamResponse,
   type ClassResponse,
-  type SchoolResponse,
-  type PaginatedScoresResponse,
-  type PaginatedStudentsResponse
+  type SchoolResponse
 } from '@/api/school'
 import {
   downloadScoreTemplate,
@@ -387,13 +401,15 @@ import {
   parseScoreExcel,
   type ScoreTemplateRow
 } from '@/utils/excelTemplate'
+import { saveFilterState, loadFilterState, clearFilterState } from '@/utils/filterStorage'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
+
+const FILTER_PAGE_KEY = 'scores'
 
 const isMobile = ref(false)
 const showAddDialog = ref(false)
 const showBatchDialog = ref(false)
 const showBatchResultDialog = ref(false)
-const uploadRef = ref<any>(null)
 const scores = ref<ScoreResponse[]>([])
 const students = ref<StudentResponse[]>([])
 const exams = ref<ExamResponse[]>([])
@@ -409,8 +425,13 @@ const formRef = ref<FormInstance>()
 const batchFormRef = ref<FormInstance>()
 const selectedIds = ref<string[]>([])
 const tableRef = ref<any>(null)
-const filterExamId = ref('')
-const filterStudentId = ref('')
+
+const defaultFilterState = { schoolId: '', examId: '', studentId: '', keyword: '' }
+const savedFilter = loadFilterState(FILTER_PAGE_KEY, defaultFilterState)
+const filterSchoolId = ref(savedFilter.schoolId)
+const filterExamId = ref(savedFilter.examId)
+const filterStudentId = ref(savedFilter.studentId)
+const searchKeyword = ref(savedFilter.keyword)
 
 const form = reactive({
   student_id: '',
@@ -432,9 +453,8 @@ const form = reactive({
 
 const batchForm = reactive({
   school_id: '',
-  exam_id: '',
-  class_ids: [] as string[],
-  student_ids: [] as string[]
+  grade: '',
+  exam_id: ''
 })
 
 const batchResult = reactive({
@@ -444,18 +464,6 @@ const batchResult = reactive({
 })
 
 const previewScores = ref<any[]>([])
-
-const batchRules: FormRules = {
-  school_id: [
-    { required: true, message: '请选择学校', trigger: 'change' }
-  ],
-  exam_id: [
-    { required: true, message: '请选择考试', trigger: 'change' }
-  ],
-  class_ids: [
-    { required: true, type: 'array', min: 1, message: '请至少选择一个班级', trigger: 'change' }
-  ]
-}
 
 const rules: FormRules = {
   student_id: [
@@ -474,12 +482,57 @@ const filteredScores = computed(() => {
   if (filterStudentId.value) {
     result = result.filter(s => s.student_id === filterStudentId.value)
   }
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    const matchedStudentIds = students.value
+      .filter(st => st.name.toLowerCase().includes(keyword))
+      .map(st => st.id)
+    result = result.filter(s => matchedStudentIds.includes(s.student_id))
+  }
   return result
 })
 
-const filteredClassesForBatch = computed(() => {
+const filteredExamsForFilter = computed(() => {
+  if (!filterSchoolId.value) return []
+  return exams.value.filter(e => e.school_id === filterSchoolId.value)
+})
+
+const handleSchoolFilterChange = () => {
+  filterExamId.value = ''
+  saveCurrentFilter()
+}
+
+const handleFilterChange = () => {
+  clearSelection()
+  saveCurrentFilter()
+}
+
+const saveCurrentFilter = () => {
+  saveFilterState(FILTER_PAGE_KEY, {
+    schoolId: filterSchoolId.value,
+    examId: filterExamId.value,
+    studentId: filterStudentId.value,
+    keyword: searchKeyword.value
+  })
+}
+
+const resetFilters = () => {
+  filterSchoolId.value = ''
+  filterExamId.value = ''
+  filterStudentId.value = ''
+  searchKeyword.value = ''
+  clearFilterState(FILTER_PAGE_KEY)
+}
+
+watch([filterSchoolId, filterExamId, filterStudentId, searchKeyword], () => {
+  saveCurrentFilter()
+})
+
+const filteredGradesForBatch = computed(() => {
   if (!batchForm.school_id) return []
-  return classes.value.filter(c => c.school_id === batchForm.school_id)
+  const schoolClasses = classes.value.filter(c => c.school_id === batchForm.school_id)
+  const grades = [...new Set(schoolClasses.map(c => c.grade).filter(g => g))]
+  return grades.map(g => ({ label: g || '未分年级', value: g }))
 })
 
 const filteredExamsForBatch = computed(() => {
@@ -550,10 +603,6 @@ const loadExams = async () => {
   }
 }
 
-const handleFilterChange = () => {
-  clearSelection()
-}
-
 const handleSelectionChange = (selection: ScoreResponse[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
@@ -577,21 +626,50 @@ const handleBatchAdd = () => {
 }
 
 const handleBatchSchoolChange = () => {
-  batchForm.class_ids = []
+  batchForm.grade = ''
   batchForm.exam_id = ''
   previewScores.value = []
 }
 
-const handleClassChange = () => {
+const handleGradeChangeForTemplate = () => {
   previewScores.value = []
 }
 
-const handleDownloadScoreTemplate = () => {
-  const exam = exams.value.find(e => e.id === batchForm.exam_id)
-  const examName = exam?.name || '考试'
-  const classStudents = students.value.filter(s => batchForm.class_ids.includes(s.class_id))
-  downloadScoreTemplate(examName, classStudents.map(s => ({ name: s.name, student_number: s.student_number })))
-  ElMessage.success('模板下载成功')
+const handleDownloadScoreTemplate = async () => {
+  if (!batchForm.school_id || !batchForm.grade) return
+  
+  const school = schools.value.find(s => s.id === batchForm.school_id)
+  const schoolName = school?.name || '学校'
+  
+  const gradeClasses = classes.value.filter(c => c.school_id === batchForm.school_id && c.grade === batchForm.grade)
+  
+  if (gradeClasses.length === 0) {
+    ElMessage.warning('该年级暂无班级数据')
+    return
+  }
+  
+  const allStudents: { name: string; student_number: string }[] = []
+  
+  for (const cls of gradeClasses) {
+    try {
+      const response = await getClassStudents(cls.id)
+      const classStudents = response.data.map(s => ({
+        name: s.name,
+        student_number: s.student_number
+      }))
+      allStudents.push(...classStudents)
+    } catch (error) {
+      console.error(`获取班级 ${cls.name} 学生失败:`, error)
+    }
+  }
+  
+  if (allStudents.length === 0) {
+    ElMessage.warning('该年级暂无学生数据')
+    return
+  }
+  
+  downloadScoreTemplate(`${schoolName}-${batchForm.grade}`, allStudents)
+  ElMessage.success(`模板下载成功，共 ${allStudents.length} 名学生`)
 }
 
 const handleScoreExcelUpload = async (uploadFile: UploadFile) => {
@@ -661,9 +739,9 @@ const handleScoreBatchSubmit = async () => {
 
     const response = await createScoreBatch(scoreData)
     
-    batchResult.success_count = response.data?.success_count || scoreData.length
-    batchResult.fail_count = response.data?.fail_count || 0
-    batchResult.errors = response.data?.errors || []
+    batchResult.success_count = response.data?.length || scoreData.length
+    batchResult.fail_count = 0
+    batchResult.errors = []
 
     showBatchDialog.value = false
     showBatchResultDialog.value = true
@@ -826,8 +904,6 @@ const resetForm = () => {
 const resetBatchForm = () => {
   batchForm.school_id = ''
   batchForm.exam_id = ''
-  batchForm.class_ids = []
-  batchForm.student_ids = []
   previewScores.value = []
   batchFormRef.value?.clearValidate()
 }

@@ -176,10 +176,22 @@
           <span class="font-semibold text-slate-900">快捷操作</span>
         </div>
       </template>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div @click="goToSentenceSet" class="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div @click="goToSchoolManagement" class="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white">
+              <el-icon class="text-2xl"><School /></el-icon>
+            </div>
+            <div>
+              <h3 class="font-semibold text-slate-900">学校管理</h3>
+              <p class="text-sm text-slate-500">管理学校、班级、学生</p>
+            </div>
+          </div>
+        </div>
+        
+        <div @click="goToSentenceSet" class="p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white">
               <el-icon class="text-2xl"><Collection /></el-icon>
             </div>
             <div>
@@ -189,9 +201,9 @@
           </div>
         </div>
         
-        <div @click="goToCategories" class="p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
+        <div @click="goToCategories" class="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white">
+            <div class="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center text-white">
               <el-icon class="text-2xl"><PriceTag /></el-icon>
             </div>
             <div>
@@ -201,9 +213,9 @@
           </div>
         </div>
         
-        <div @click="goToSentences" class="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
+        <div @click="goToSentences" class="p-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl cursor-pointer hover:-translate-y-1 transition-all hover:shadow-md">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center text-white">
+            <div class="w-12 h-12 rounded-xl bg-orange-600 flex items-center justify-center text-white">
               <el-icon class="text-2xl"><Document /></el-icon>
             </div>
             <div>
@@ -238,7 +250,8 @@ import {
   PriceTag,
   Refresh,
   Loading,
-  Warning
+  Warning,
+  School
 } from '@element-plus/icons-vue'
 import { getHealthCheck, type HealthCheckResponse } from '@/api/health'
 import {
@@ -375,6 +388,10 @@ const fetchOpenAPIData = async () => {
   } finally {
     openapiLoading.value = false
   }
+}
+
+const goToSchoolManagement = () => {
+  router.push('/school-management/overview')
 }
 
 const goToSentenceSet = () => {

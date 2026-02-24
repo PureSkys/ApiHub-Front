@@ -146,7 +146,15 @@ export const parseExcelFile = <T>(file: File): Promise<T[]> => {
         const data = e.target?.result
         const workbook = XLSX.read(data, { type: 'array' })
         const sheetName = workbook.SheetNames[0]
+        if (!sheetName) {
+          resolve([])
+          return
+        }
         const worksheet = workbook.Sheets[sheetName]
+        if (!worksheet) {
+          resolve([])
+          return
+        }
         const jsonData = XLSX.utils.sheet_to_json<T>(worksheet)
         resolve(jsonData)
       } catch (error) {

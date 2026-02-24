@@ -1,5 +1,5 @@
 <template>
-  <el-container class="flex h-screen bg-slate-100">
+  <el-container class="h-screen bg-slate-100">
     <el-drawer
       v-if="isMobile"
       v-model="sidebarOpen"
@@ -12,7 +12,7 @@
           <h1 class="text-2xl font-bold text-slate-900 mb-1">ApiHub</h1>
           <p class="text-sm text-slate-500">API 聚合中心</p>
         </div>
-        <nav class="flex-1 py-3">
+        <nav class="flex-1 py-3 overflow-y-auto">
           <el-menu
             :default-active="activeMenu"
             class="border-0"
@@ -51,12 +51,12 @@
       </div>
     </el-drawer>
 
-    <aside class="hidden lg:block w-64 bg-white border-r border-slate-200 flex flex-col">
-      <div class="p-7 border-b border-slate-100">
+    <aside class="hidden lg:block w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+      <div class="p-7 border-b border-slate-100 shrink-0">
         <h1 class="text-2xl font-bold text-slate-900 mb-1">ApiHub</h1>
         <p class="text-sm text-slate-500">API 聚合中心</p>
       </div>
-      <nav class="flex-1 py-3">
+      <nav class="flex-1 py-3 overflow-y-auto">
         <el-menu
           :default-active="activeMenu"
           :collapse="false"
@@ -89,7 +89,7 @@
           </template>
         </el-menu>
       </nav>
-      <div class="p-4 border-t border-slate-100">
+      <div class="p-4 border-t border-slate-100 shrink-0">
         <span class="text-sm text-slate-400">v0.1.0</span>
       </div>
     </aside>
@@ -360,6 +360,64 @@ const handleCommand = async (command: string) => {
   .health-status-tag {
     padding: 0.5rem 1.25rem;
   }
+}
+
+:deep(.el-sub-menu__popper) {
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+:deep(.el-menu--vertical .el-sub-menu__popper) {
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+:deep(.el-menu--popup) {
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+:deep(.el-menu) {
+  border-right: none !important;
+}
+
+:deep(.el-sub-menu .el-menu) {
+  background-color: transparent;
+}
+
+:deep(.el-sub-menu .el-menu-item) {
+  min-width: auto;
+}
+
+aside {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+aside nav {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+aside nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+aside nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+aside nav::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+aside nav::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
 }
 </style>
 

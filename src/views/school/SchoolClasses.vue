@@ -1,10 +1,19 @@
 <template>
   <div class="space-y-5">
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-4">
-        <el-select v-model="filterSchoolId" placeholder="筛选学校" clearable class="w-48" @change="handleFilterChange">
+    <div class="flex justify-between items-center flex-wrap gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <el-select v-model="filterSchoolId" placeholder="筛选学校" clearable class="w-44" @change="handleFilterChange">
           <el-option v-for="school in schools" :key="school.id" :label="school.name" :value="school.id" />
         </el-select>
+        <el-input v-model="searchKeyword" placeholder="搜索班级名称" clearable class="w-48">
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button @click="resetFilters" size="default">
+          <el-icon><Refresh /></el-icon>
+          重置
+        </el-button>
       </div>
       <div v-if="selectedIds.length > 0" class="flex items-center gap-3">
         <span class="text-slate-600">已选择 {{ selectedIds.length }} 项</span>
@@ -205,8 +214,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { Plus, Delete, Upload, Download, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getClasses,
@@ -227,14 +236,16 @@ import {
   parseClassExcel,
   type ClassTemplateRow
 } from '@/utils/excelTemplate'
+import { saveFilterState, loadFilterState, clearFilterState } from '@/utils/filterStorage'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
+
+const FILTER_PAGE_KEY = 'classes'
 
 const isMobile = ref(false)
 const showAddDialog = ref(false)
 const showStudentsDialog = ref(false)
 const showBatchDialog = ref(false)
 const showBatchResultDialog = ref(false)
-const uploadRef = ref<any>(null)
 const classes = ref<ClassResponse[]>([])
 const schools = ref<SchoolResponse[]>([])
 const students = ref<StudentResponse[]>([])
@@ -249,7 +260,11 @@ const formRef = ref<FormInstance>()
 const batchFormRef = ref<FormInstance>()
 const selectedIds = ref<string[]>([])
 const tableRef = ref<any>(null)
-const filterSchoolId = ref('')
+
+const defaultFilterState = { schoolId: '', keyword: '' }
+const savedFilter = loadFilterState(FILTER_PAGE_KEY, defaultFilterState)
+const filterSchoolId = ref(savedFilter.schoolId)
+const searchKeyword = ref(savedFilter.keyword)
 
 const batchResult = reactive<BatchImportResult>({
   success_count: 0,
@@ -300,8 +315,37 @@ const rules: FormRules = {
 }
 
 const filteredClasses = computed(() => {
-  if (!filterSchoolId.value) return classes.value
-  return classes.value.filter(c => c.school_id === filterSchoolId.value)
+  let result = classes.value
+  if (filterSchoolId.value) {
+    result = result.filter(c => c.school_id === filterSchoolId.value)
+  }
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(c => c.name.toLowerCase().includes(keyword))
+  }
+  return result
+})
+
+const handleFilterChange = () => {
+  clearSelection()
+  saveCurrentFilter()
+}
+
+const saveCurrentFilter = () => {
+  saveFilterState(FILTER_PAGE_KEY, {
+    schoolId: filterSchoolId.value,
+    keyword: searchKeyword.value
+  })
+}
+
+const resetFilters = () => {
+  filterSchoolId.value = ''
+  searchKeyword.value = ''
+  clearFilterState(FILTER_PAGE_KEY)
+}
+
+watch([filterSchoolId, searchKeyword], () => {
+  saveCurrentFilter()
 })
 
 const copyToClipboard = (text: string) => {
@@ -337,10 +381,6 @@ const loadSchools = async () => {
   } catch (error) {
     console.error('加载学校失败:', error)
   }
-}
-
-const handleFilterChange = () => {
-  clearSelection()
 }
 
 const handleSelectionChange = (selection: ClassResponse[]) => {

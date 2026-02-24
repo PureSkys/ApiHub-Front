@@ -248,7 +248,7 @@ const loadSchools = async () => {
 const loadStudents = async () => {
   try {
     const response = await getStudents()
-    students.value = response.data
+    students.value = response.data.items || []
   } catch (error) {
     console.error('加载学生失败:', error)
   }
