@@ -157,63 +157,63 @@
         </div>
       </div>
       <el-table :data="scores" style="width: 100%" :stripe="true" v-loading="scoresLoading" max-height="400" border size="small">
-        <el-table-column label="考试" width="120" fixed>
+        <el-table-column label="考试" min-width="100" fixed>
           <template #default="{ row }">
             {{ getExamName(row.exam_id) }}
           </template>
         </el-table-column>
         <el-table-column label="主科(150)" align="center">
-          <el-table-column prop="chinese" label="语文" width="60" align="center">
+          <el-table-column prop="chinese" label="语文" min-width="50" align="center">
             <template #default="{ row }">{{ row.chinese ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="math" label="数学" width="60" align="center">
+          <el-table-column prop="math" label="数学" min-width="50" align="center">
             <template #default="{ row }">{{ row.math ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="english" label="英语" width="60" align="center">
+          <el-table-column prop="english" label="英语" min-width="50" align="center">
             <template #default="{ row }">{{ row.english ?? '-' }}</template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="理科(100)" align="center">
-          <el-table-column prop="physics" label="物理" width="55" align="center">
+          <el-table-column prop="physics" label="物理" min-width="45" align="center">
             <template #default="{ row }">{{ row.physics ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="chemistry" label="化学" width="55" align="center">
+          <el-table-column prop="chemistry" label="化学" min-width="45" align="center">
             <template #default="{ row }">{{ row.chemistry ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="chemistry_assigned" label="化赋" width="55" align="center">
+          <el-table-column prop="chemistry_assigned" label="化赋" min-width="45" align="center">
             <template #default="{ row }"><span class="text-blue-500">{{ row.chemistry_assigned ?? '-' }}</span></template>
           </el-table-column>
-          <el-table-column prop="biology" label="生物" width="55" align="center">
+          <el-table-column prop="biology" label="生物" min-width="45" align="center">
             <template #default="{ row }">{{ row.biology ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="biology_assigned" label="生赋" width="55" align="center">
+          <el-table-column prop="biology_assigned" label="生赋" min-width="45" align="center">
             <template #default="{ row }"><span class="text-blue-500">{{ row.biology_assigned ?? '-' }}</span></template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="文科(100)" align="center">
-          <el-table-column prop="history" label="历史" width="55" align="center">
+          <el-table-column prop="history" label="历史" min-width="45" align="center">
             <template #default="{ row }">{{ row.history ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="politics" label="政治" width="55" align="center">
+          <el-table-column prop="politics" label="政治" min-width="45" align="center">
             <template #default="{ row }">{{ row.politics ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="politics_assigned" label="政赋" width="55" align="center">
+          <el-table-column prop="politics_assigned" label="政赋" min-width="45" align="center">
             <template #default="{ row }"><span class="text-blue-500">{{ row.politics_assigned ?? '-' }}</span></template>
           </el-table-column>
-          <el-table-column prop="geography" label="地理" width="55" align="center">
+          <el-table-column prop="geography" label="地理" min-width="45" align="center">
             <template #default="{ row }">{{ row.geography ?? '-' }}</template>
           </el-table-column>
-          <el-table-column prop="geography_assigned" label="地赋" width="55" align="center">
+          <el-table-column prop="geography_assigned" label="地赋" min-width="45" align="center">
             <template #default="{ row }"><span class="text-blue-500">{{ row.geography_assigned ?? '-' }}</span></template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="总分" align="center" fixed="right">
-          <el-table-column label="原始" width="60" align="center">
+          <el-table-column label="原始" min-width="50" align="center">
             <template #default="{ row }">
               <span class="font-bold text-green-600">{{ calculateTotal(row) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="赋分" width="60" align="center">
+          <el-table-column label="赋分" min-width="50" align="center">
             <template #default="{ row }">
               <span class="font-bold text-cyan-600">{{ calculateTotalAssigned(row) }}</span>
             </template>

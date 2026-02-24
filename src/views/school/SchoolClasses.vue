@@ -115,7 +115,7 @@
     </el-dialog>
 
     <el-dialog v-model="showStudentsDialog" title="班级学生" width="700px" :fullscreen="isMobile" class="custom-dialog">
-      <el-table :data="students" style="width: 100%" :stripe="true" v-loading="studentsLoading">
+      <el-table :data="students" style="width: 100%" :stripe="true" v-loading="studentsLoading" max-height="400">
         <el-table-column prop="name" label="姓名" width="120" />
         <el-table-column prop="gender" label="性别" width="80" />
         <el-table-column prop="student_number" label="学号" width="150" />
